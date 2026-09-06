@@ -11,6 +11,16 @@ function uniq(values) {
   return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
 }
 
+function displayValue(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return uniq(value.map(displayValue)).join(", ");
+  if (typeof value === "object") {
+    return String(value.name || value.title || value.value || value.label || "").trim();
+  }
+  return String(value);
+}
+
 function stringValues(value) {
   if (!value) return [];
   if (typeof value === "string") return [value];
@@ -219,7 +229,11 @@ function normalizeResult(item, query) {
   const exactMatchedAlias = aliases.find(
     (alias) => normalizeText(alias) === normalizeText(query)
   );
-  const matchedAlias = exactMatchedAlias || (ranked.matchType === "alias" ? ranked.matched : null);
+  const alternateMatchedTitle =
+    ranked.matched && normalizeText(ranked.matched) !== normalizeText(displayName)
+      ? ranked.matched
+      : null;
+  const matchedAlias = exactMatchedAlias || alternateMatchedTitle;
 
   return {
     tvdb_id: Number(item?.tvdb_id || item?.id) || null,
@@ -236,9 +250,14 @@ function normalizeResult(item, query) {
     first_air_time: item?.first_air_time || item?.firstAired || item?.first_air_date || null,
     image_url: item?.image_url || item?.image || null,
     poster_url: item?.image_url || item?.image || null,
-    network:
-      item?.network || item?.originalNetwork || item?.latestNetwork || item?.company || null,
-    genres: Array.isArray(item?.genres) ? item.genres : [],
+    network: displayValue(
+      item?.network || item?.originalNetwork || item?.latestNetwork || item?.company
+    ) || null,
+    genres: uniq(
+      (Array.isArray(item?.genres) ? item.genres : [])
+        .map((genre) => displayValue(genre))
+        .filter(Boolean)
+    ),
     original_language: item?.originalLanguage || item?.language || "",
     source: "tvdb",
     _score: ranked.score,
