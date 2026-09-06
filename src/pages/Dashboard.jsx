@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v8_RECENT_WATCH";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v9_LEAN_DATA";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 60 * 24;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -156,6 +156,8 @@ async function fetchEpisodesForShowIds(showIds) {
         .from("episodes")
         .select("id, show_id, season_number, episode_number, name, aired_date, runtime_minutes")
         .in("show_id", batch)
+        .gt("season_number", 0)
+        .gt("episode_number", 0)
         .order("show_id", { ascending: true })
         .order("season_number", { ascending: true })
         .order("episode_number", { ascending: true })
@@ -172,24 +174,36 @@ async function fetchEpisodesForShowIds(showIds) {
   return allEpisodes;
 }
 
-async function fetchAllWatchedEpisodeRows(userId) {
-  const pageSize = 1000;
+async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
+  if (!userId || !showIds.length) return [];
+
   const allRows = [];
-  let from = 0;
-  let done = false;
+  const pageSize = 1000;
 
-  while (!done) {
-    const { data, error } = await supabase
-      .from("watched_episodes")
-      .select("episode_id, watched_at")
-      .eq("user_id", userId)
-      .range(from, from + pageSize - 1);
+  for (const batch of chunkArray(showIds, 40)) {
+    let from = 0;
+    let done = false;
 
-    if (error) throw error;
-    const rows = data || [];
-    allRows.push(...rows);
-    done = rows.length < pageSize;
-    from += pageSize;
+    while (!done) {
+      const { data, error } = await supabase
+        .from("watched_episodes")
+        .select("episode_id, watched_at, episodes!inner(show_id)")
+        .eq("user_id", userId)
+        .in("episodes.show_id", batch)
+        .order("watched_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) throw error;
+      const rows = data || [];
+      allRows.push(
+        ...rows.map((row) => ({
+          episode_id: row.episode_id,
+          watched_at: row.watched_at,
+        }))
+      );
+      done = rows.length < pageSize;
+      from += pageSize;
+    }
   }
 
   return allRows;
@@ -229,27 +243,40 @@ async function fetchDatabaseShowMatches(externalShows) {
   const tvdbIds = Array.from(
     new Set((externalShows || []).map((show) => show?.tvdb_id).filter(Boolean).map(String))
   );
-  const rows = [];
+
+  const queries = [];
 
   if (tmdbIds.length) {
-    const { data, error } = await supabase
-      .from("shows")
-      .select("id, tvdb_id, tmdb_id, name, poster_url")
-      .in("tmdb_id", tmdbIds);
-    if (error) throw error;
-    rows.push(...(data || []));
+    queries.push(
+      supabase
+        .from("shows")
+        .select("id, tvdb_id, tmdb_id, name, poster_url")
+        .in("tmdb_id", tmdbIds)
+    );
   }
 
   if (tvdbIds.length) {
-    const { data, error } = await supabase
-      .from("shows")
-      .select("id, tvdb_id, tmdb_id, name, poster_url")
-      .in("tvdb_id", tvdbIds);
-    if (error) throw error;
-    rows.push(...(data || []));
+    queries.push(
+      supabase
+        .from("shows")
+        .select("id, tvdb_id, tmdb_id, name, poster_url")
+        .in("tvdb_id", tvdbIds)
+    );
   }
 
-  return Array.from(new Map(rows.filter((show) => show?.id).map((show) => [String(show.id), show])).values());
+  if (!queries.length) return [];
+
+  const results = await Promise.all(queries);
+  const rows = [];
+
+  results.forEach(({ data, error }) => {
+    if (error) throw error;
+    rows.push(...(data || []));
+  });
+
+  return Array.from(
+    new Map(rows.filter((show) => show?.id).map((show) => [String(show.id), show])).values()
+  );
 }
 
 function getExternalShowLink(show, savedShows, databaseShows) {
@@ -298,7 +325,7 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
   const visibleShows = (savedShows || []).filter((show) => !isArchivedStatus(show.watch_status));
   const showsById = new Map(visibleShows.map((show) => [String(show.show_id), show]));
 
-  // Specials (season 0) are intentionally excluded from progress/completion data.
+  // Specials (season 0) are excluded at query time and kept out here as a safety guard.
   const regularEpisodes = (episodes || [])
     .map(normalizeEpisode)
     .filter((episode) => episode.seasonNumber > 0 && episode.episodeNumber > 0)
@@ -588,9 +615,15 @@ export default function Dashboard() {
           first_aired: row.shows?.first_aired || null,
         }));
 
-        const showIds = normalizedShows.map((show) => show.show_id).filter(Boolean);
+        const showIds = normalizedShows
+          .filter((show) => !isArchivedStatus(show.watch_status))
+          .map((show) => show.show_id)
+          .filter(Boolean);
+
         const [watchedRows, allEpisodes, trending, premieringSoon] = await Promise.all([
-          showIds.length ? fetchAllWatchedEpisodeRows(user.id) : Promise.resolve([]),
+          showIds.length
+            ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
+            : Promise.resolve([]),
           showIds.length ? fetchEpisodesForShowIds(showIds) : Promise.resolve([]),
           fetchTrendingShows().catch(() => []),
           fetchPremieringSoonShows().catch(() => []),
