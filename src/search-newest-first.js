@@ -15,7 +15,16 @@ function getFirstAiredTimestamp(card) {
   return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
 }
 
+function isTitleSearchActive() {
+  const activeMode = document.querySelector('.search-mode-button.is-active');
+  return activeMode?.textContent?.trim().toLowerCase() === 'title';
+}
+
 function sortSearchResultsNewestFirst() {
+  // Title searches are ranked by relevance in the search API, including aliases.
+  // Do not override that ranking with a client-side newest-first sort.
+  if (isTitleSearchActive()) return;
+
   const list = document.querySelector('.search-results-list');
   if (!list) return;
 
