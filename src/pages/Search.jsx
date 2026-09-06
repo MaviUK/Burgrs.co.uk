@@ -531,6 +531,12 @@ export default function Search() {
             const genres = listText(show.genres);
             const platform = show.platform || show.network || "";
             const studio = show.studio || listText(show.studios, 2);
+            const matchedAlias =
+              show.matched_alias &&
+              String(show.matched_alias).trim().toLowerCase() !==
+                String(show.name || show.show_name || "").trim().toLowerCase()
+                ? String(show.matched_alias).trim()
+                : "";
 
             return (
               <div
@@ -568,6 +574,13 @@ export default function Search() {
                     </Link>
 
                     <div className="search-result-meta">
+                      {matchedAlias ? (
+                        <div className="search-result-meta-row">
+                          <span className="search-result-meta-label">Also known as</span>
+                          <span className="search-result-meta-value">{matchedAlias}</span>
+                        </div>
+                      ) : null}
+
                       {firstAired ? (
                         <div className="search-result-meta-row">
                           <span className="search-result-meta-label">First aired</span>
