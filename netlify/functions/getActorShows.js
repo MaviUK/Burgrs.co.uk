@@ -1,5 +1,4 @@
 import { tmdbFetch, buildTmdbImageUrl } from "./_tmdb.js";
-import { enrichShowsWithMappings } from "./_showMapping.js";
 
 function jsonResponse(statusCode, body) {
   return {
@@ -77,9 +76,6 @@ function sortCreditsNewestFirst(credits = []) {
   });
 }
 
-//
-// ✅ NEW CLEAN FILTER
-//
 function isValidScriptedShow(item) {
   if (!item?.name) return false;
 
@@ -174,7 +170,7 @@ export const handler = async (event) => {
       dedupeCredits(
         rawCredits
           .filter((item) => item?.id && item?.name)
-          .filter(isValidScriptedShow) // ✅ NEW FILTER
+          .filter(isValidScriptedShow)
           .map((item) => ({
             id: item.id,
             tmdb_id: item.id,
@@ -197,50 +193,31 @@ export const handler = async (event) => {
       )
     );
 
-    let mappedCredits = [];
-
-    try {
-      mappedCredits = await enrichShowsWithMappings(cleanedCredits);
-    } catch (mappingError) {
-      console.error("Mapping failed:", mappingError);
-      mappedCredits = cleanedCredits.map((item) => ({
-        ...item,
-        tvdb_id: null,
-        mapping_status: "error",
-        mapping_confidence: 0,
-      }));
-    }
-
-    const output = mappedCredits.map((item) => {
-  const resolvedTvdbId =
-    item?.resolved_tvdb_id ??
-    item?.tvdb_id ??
-    item?.mapped_tvdb_id ??
-    item?.show_tvdb_id ??
-    null;
-
-  return {
-    id: item?.id ?? null,
-    tmdb_id: item?.tmdb_id ?? null,
-    tvdb_id: item?.tvdb_id ?? null,
-    resolved_tvdb_id: resolvedTvdbId,
-    mapped_tvdb_id: resolvedTvdbId,
-    name: item?.name || "",
-    overview: item?.overview || "",
-    first_air_date: item?.first_air_date || null,
-    image_url: item?.image_url || null,
-    poster_url: item?.poster_url || null,
-    backdrop_url:
-      item?.backdrop_url ||
-      (item?.backdrop_path
+    // Actor credits originate from TMDB, so keep the TMDB series ID as the
+    // canonical identity here. Mapping every credit to TVDB can create a false
+    // saved-state match and can route one title to a different saved show.
+    // TVDB mapping still happens later when a show is saved/synced where needed.
+    const output = cleanedCredits.map((item) => ({
+      id: item.id,
+      tmdb_id: item.tmdb_id,
+      tvdb_id: null,
+      resolved_tvdb_id: null,
+      mapped_tvdb_id: null,
+      name: item.name || "",
+      original_name: item.original_name || "",
+      overview: item.overview || "",
+      first_air_date: item.first_air_date || null,
+      image_url: item.image_url || null,
+      poster_url: item.poster_url || null,
+      backdrop_url: item.backdrop_path
         ? buildTmdbImageUrl(item.backdrop_path, "original")
-        : null),
-    rating_average: Number(item?.vote_average || 0),
-    rating_count: Number(item?.vote_count || 0),
-    character: item?.character || "",
-    mapping_status: item?.mapping_status || null,
-  };
-});
+        : null,
+      rating_average: Number(item.vote_average || 0),
+      rating_count: Number(item.vote_count || 0),
+      character: item.character || "",
+      mapping_status: "tmdb_exact",
+      source: "tmdb",
+    }));
 
     return jsonResponse(200, {
       actor: {
