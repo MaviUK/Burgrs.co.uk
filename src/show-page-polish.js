@@ -342,7 +342,8 @@ function createQuickSpotlight(route, context) {
     const progressLabel = document.createElement("span");
     progressLabel.textContent = "Your progress";
     const progressValue = document.createElement("strong");
-    const percentage = progress?.percent ?? Number.parseInt(progressFromPage, 10) || 0;
+    const pagePercentage = Number.parseInt(progressFromPage, 10);
+    const percentage = progress?.percent ?? (Number.isFinite(pagePercentage) ? pagePercentage : 0);
     progressValue.textContent = progress
       ? `${progress.watched}/${progress.total} · ${percentage}%`
       : `${watchedFromPage || "0"}/${totalFromPage || "0"} · ${progressFromPage || "0%"}`;
