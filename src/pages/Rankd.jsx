@@ -77,12 +77,25 @@ function isFocusSettled(items, focus) {
 
   const above = sorted[index - 1];
   const below = sorted[index + 1];
+  const testedIds = new Set((focus.testedIds || []).map(String));
   const lostToAbove =
     !above || (focus.lostToIds || []).includes(String(above.show_id));
   const beatBelow =
     !below || (focus.beatenIds || []).includes(String(below.show_id));
 
-  return lostToAbove && beatBelow;
+  const hasUntestedAbove = sorted
+    .slice(0, index)
+    .some((show) => !testedIds.has(String(show.show_id)));
+  const hasUntestedBelow = sorted
+    .slice(index + 1)
+    .some((show) => !testedIds.has(String(show.show_id)));
+
+  const checkedAbove =
+    !above || Boolean(focus.checkedAbove) || !hasUntestedAbove;
+  const checkedBelow =
+    !below || Boolean(focus.checkedBelow) || !hasUntestedBelow;
+
+  return lostToAbove && beatBelow && checkedAbove && checkedBelow;
 }
 
 function getFocusedPair(items, focusShowId, focus = null) {
@@ -94,28 +107,29 @@ function getFocusedPair(items, focusShowId, focus = null) {
 
   const focusShow = sorted[focusIndex];
   const testedIds = new Set((focus?.testedIds || []).map(String));
-  const offsets = [-1, 1, -2, 2, -4, 4, -3, 3, -6, 6, -5, 5, -8, 8, -10, 10];
+  const preferredDirection = focus?.direction === "down" ? "down" : "up";
 
-  let opponent = null;
-  for (const offset of offsets) {
-    const candidate = sorted[focusIndex + offset];
-    if (
-      candidate &&
-      String(candidate.show_id) !== String(focusShowId) &&
-      !testedIds.has(String(candidate.show_id))
-    ) {
-      opponent = candidate;
-      break;
+  function findOpponent(direction) {
+    if (direction === "up") {
+      for (let index = focusIndex - 1; index >= 0; index -= 1) {
+        const candidate = sorted[index];
+        if (!candidate || testedIds.has(String(candidate.show_id))) continue;
+        return candidate;
+      }
+      return null;
     }
+
+    for (let index = focusIndex + 1; index < sorted.length; index += 1) {
+      const candidate = sorted[index];
+      if (!candidate || testedIds.has(String(candidate.show_id))) continue;
+      return candidate;
+    }
+    return null;
   }
 
-  if (!opponent) {
-    opponent = sorted.find(
-      (show) =>
-        String(show.show_id) !== String(focusShowId) &&
-        !testedIds.has(String(show.show_id))
-    );
-  }
+  const opponent =
+    findOpponent(preferredDirection) ||
+    findOpponent(preferredDirection === "up" ? "down" : "up");
 
   if (!opponent) return [];
   return Math.random() > 0.5
@@ -787,13 +801,27 @@ export default function Rankd() {
     const previousPairKey = currentPairKey;
     let nextFocus = rankFocus;
     let nextPair = [];
+    let nextNotice = "";
 
     if (rankFocus?.showId) {
       const focusWon = String(winner.show_id) === String(rankFocus.showId);
       const opponent = focusWon ? loser : winner;
+      const focusIndexBefore = beforeLadder.findIndex(
+        (show) => String(show.show_id) === String(rankFocus.showId)
+      );
+      const opponentIndexBefore = beforeLadder.findIndex(
+        (show) => String(show.show_id) === String(opponent.show_id)
+      );
+      const opponentWasAbove =
+        focusIndexBefore >= 0 && opponentIndexBefore >= 0 && opponentIndexBefore < focusIndexBefore;
+      const opponentWasBelow =
+        focusIndexBefore >= 0 && opponentIndexBefore >= 0 && opponentIndexBefore > focusIndexBefore;
 
       nextFocus = {
         ...rankFocus,
+        direction: focusWon ? "up" : "down",
+        checkedAbove: Boolean(rankFocus.checkedAbove || opponentWasAbove),
+        checkedBelow: Boolean(rankFocus.checkedBelow || opponentWasBelow),
         testedIds: [
           ...new Set([
             ...(rankFocus.testedIds || []),
@@ -821,19 +849,18 @@ export default function Rankd() {
       if (isFocusSettled(updatedLadder, nextFocus)) {
         nextFocus = null;
         setRankFocus(null);
-        setNotice(
-          `${rankFocus.showName || "This show"} is now in its confirmed position.`
-        );
+        nextNotice = `${rankFocus.showName || "This show"} is now in its confirmed position.`;
       } else {
         nextPair = getFocusedPair(updatedLadder, nextFocus.showId, nextFocus);
         if (nextPair.length === 2) {
           setRankFocus(nextFocus);
+          nextNotice = `Ranking ${rankFocus.showName || "this show"}. Checking ${
+            nextFocus.direction === "up" ? "higher" : "lower"
+          } in your list.`;
         } else {
           nextFocus = null;
           setRankFocus(null);
-          setNotice(
-            `${rankFocus.showName || "This show"} has no more untested opponents.`
-          );
+          nextNotice = `${rankFocus.showName || "This show"} is now in the best confirmed position from the available comparisons.`;
         }
       }
     }
@@ -857,7 +884,7 @@ export default function Rankd() {
     setCurrentPair(nextPair);
     setMatchupStats(null);
     setOverallStatsByShow({});
-    setNotice("");
+    setNotice(nextNotice);
 
     if (activeUserId) {
       queueVoteSave({ userIdValue: activeUserId, winner, loser, beforeLadder, updatedLadder });
@@ -962,6 +989,9 @@ export default function Rankd() {
       testedIds: [],
       beatenIds: [],
       lostToIds: [],
+      checkedAbove: false,
+      checkedBelow: false,
+      direction: "up",
     };
 
     const pair = getFocusedPair(eligibleShows, show.show_id, focus);
@@ -973,7 +1003,7 @@ export default function Rankd() {
     setRankFocus(focus);
     setCurrentPair(pair);
     setNotice(
-      `Ranking ${show.show_name}. Keep choosing until its position is confirmed.`
+      `Ranking ${show.show_name}. BURGRS will move it higher or lower until its position is confirmed.`
     );
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
