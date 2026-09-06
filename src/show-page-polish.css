@@ -1,0 +1,274 @@
+.burgr-show-spotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.8fr) auto;
+  gap: 14px;
+  align-items: stretch;
+  margin: 2px 0 18px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.burgr-show-spotlight-main,
+.burgr-show-progress-block {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.burgr-show-spotlight-main {
+  gap: 5px;
+}
+
+.burgr-show-spotlight-eyebrow,
+.burgr-show-progress-copy span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.burgr-show-spotlight-title {
+  color: #fff;
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+
+.burgr-show-spotlight-date {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.84rem;
+}
+
+.burgr-show-spotlight-jump {
+  width: max-content;
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.burgr-show-progress-block {
+  gap: 9px;
+}
+
+.burgr-show-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.burgr-show-progress-copy strong {
+  color: #fff;
+  font-size: 0.86rem;
+}
+
+.burgr-show-progress-rail {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.burgr-show-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  color: #fff;
+}
+
+.burgr-show-trailer-button {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.burgr-season-picker {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: -4px 0 16px;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.burgr-season-picker::-webkit-scrollbar {
+  display: none;
+}
+
+.burgr-season-chip {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.burgr-specials-panel {
+  scroll-margin-top: 120px;
+}
+
+.burgr-specials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.burgr-special-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.burgr-special-row strong {
+  min-width: 0;
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.burgr-special-row span {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.78rem;
+}
+
+.msd-season-card {
+  scroll-margin-top: 120px;
+}
+
+.msd-recommended-row {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-bottom: 6px;
+}
+
+.msd-recommended-row::-webkit-scrollbar {
+  display: none;
+}
+
+.msd-recommended-card {
+  scroll-snap-align: start;
+}
+
+@media (max-width: 768px) {
+  .msd-page .msd-mobile-banner-wrap {
+    margin-left: -16px;
+    margin-right: -16px;
+    margin-top: -20px;
+  }
+
+  .msd-page .msd-mobile-banner {
+    width: 100%;
+    height: auto !important;
+    min-height: 210px;
+    aspect-ratio: 16 / 9;
+    border-radius: 0 0 24px 24px;
+    background-size: cover;
+    background-position: center 30%;
+  }
+
+  .msd-page .msd-hero {
+    margin-top: -18px;
+    position: relative;
+    z-index: 2;
+    border-radius: 24px;
+  }
+
+  .burgr-show-spotlight {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 13px;
+    margin-top: 4px;
+  }
+
+  .burgr-show-trailer-button {
+    width: 100%;
+  }
+
+  .burgr-show-progress-block {
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .burgr-season-picker {
+    margin-left: -2px;
+    margin-right: -2px;
+  }
+
+  .msd-cast-grid-mobile {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 12px !important;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .msd-cast-grid-mobile::-webkit-scrollbar {
+    display: none;
+  }
+
+  .msd-cast-card-mobile {
+    flex: 0 0 112px;
+    min-width: 112px;
+    scroll-snap-align: start;
+  }
+
+  .msd-cast-image-mobile {
+    width: 112px !important;
+    height: 148px !important;
+    object-fit: cover;
+  }
+
+  .msd-recommended-card {
+    flex: 0 0 122px;
+    min-width: 122px;
+  }
+
+  .msd-recommended-card-image,
+  .msd-recommended-card-image-placeholder {
+    width: 122px !important;
+  }
+
+  .burgr-special-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
