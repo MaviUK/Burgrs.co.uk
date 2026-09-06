@@ -88,15 +88,21 @@ function mergeUniqueShows(existing, incoming) {
   return Array.from(merged.values());
 }
 
-function getDetailHref(show, isSaved) {
+function getDetailHref(show, savedByTvdb, savedByTmdb) {
+  if (savedByTvdb && show?.tvdb_id) {
+    return `/my-shows/${show.tvdb_id}`;
+  }
+
+  if (savedByTmdb && show?.tmdb_id) {
+    return `/my-shows/tmdb/${show.tmdb_id}`;
+  }
+
   if (show?.tvdb_id) {
-    return isSaved ? `/my-shows/${show.tvdb_id}` : `/show/${show.tvdb_id}`;
+    return `/show/${show.tvdb_id}`;
   }
 
   if (show?.tmdb_id) {
-    return isSaved
-      ? `/my-shows/tmdb/${show.tmdb_id}`
-      : `/show/tmdb/${show.tmdb_id}`;
+    return `/show/tmdb/${show.tmdb_id}`;
   }
 
   return "#";
@@ -206,7 +212,7 @@ export default function Search() {
 
     const { data, error: savedError } = await supabase
       .from("user_shows_new")
-      .select("tmdb_id, shows!inner(tvdb_id)")
+      .select("shows!inner(tvdb_id, tmdb_id)")
       .eq("user_id", userId);
 
     if (savedError) {
@@ -230,7 +236,7 @@ export default function Search() {
     setSavedTmdbIds(
       new Set(
         (data || [])
-          .map((row) => row?.tmdb_id)
+          .map((row) => row?.shows?.tmdb_id)
           .filter(Boolean)
           .map(String)
       )
@@ -518,11 +524,15 @@ export default function Search() {
         <div className="search-results-list">
           {shows.map((show) => {
             const resultKey = getResultKey(show);
-            const isSaved =
-              (show.tvdb_id && savedTvdbIds.has(String(show.tvdb_id))) ||
-              (show.tmdb_id && savedTmdbIds.has(String(show.tmdb_id)));
+            const savedByTvdb = Boolean(
+              show.tvdb_id && savedTvdbIds.has(String(show.tvdb_id))
+            );
+            const savedByTmdb = Boolean(
+              show.tmdb_id && savedTmdbIds.has(String(show.tmdb_id))
+            );
+            const isSaved = savedByTvdb || savedByTmdb;
             const isAdding = addingId === resultKey;
-            const detailHref = getDetailHref(show, isSaved);
+            const detailHref = getDetailHref(show, savedByTvdb, savedByTmdb);
             const backdrop = getBackdrop(show);
             const poster = getPoster(show);
             const firstAired = getFirstAired(show);
