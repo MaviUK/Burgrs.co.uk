@@ -63,6 +63,7 @@ import './profile-tools-final-pink-fixes.css'
 import './login-final-pink-fixes.css'
 import './following-rating-plain-text.css'
 import './show-page-polish.css'
+import './show-trailer-thumbnail.css'
 
 installNativeApiBridge()
 installNativeAuthLinks()
@@ -90,6 +91,7 @@ function loadDeferredEnhancements() {
     import('./notification-copy-cleanup.js'),
     import('./public-show-watch-providers.js'),
     import('./show-page-polish.js'),
+    import('./show-trailer-thumbnail.js'),
     import('./specials-collapse.js'),
     import('./show-data-attribution.js'),
     import('./public-show-review-access.js'),
