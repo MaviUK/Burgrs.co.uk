@@ -3,11 +3,189 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07111f" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-512.png" />
+    <link rel="apple-touch-icon" href="/favicon-512.png" />
     <title>TV Tracker</title>
-    <script type="module" crossorigin src="/assets/index-Do76elIl.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DM-xSbje.css">
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+        background: #07111f;
+      }
+
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        min-height: 100svh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+        background:
+          radial-gradient(circle at 50% 12%, rgba(124, 58, 237, 0.24), transparent 36%),
+          #07111f;
+        color: #f8fafc;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .initial-app-loader-card {
+        width: min(100%, 360px);
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+        padding: 26px 22px;
+        box-sizing: border-box;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 26px;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.76));
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+        text-align: center;
+      }
+
+      .initial-app-loader-burger {
+        font-size: 42px;
+        line-height: 1;
+        animation: initial-loader-float 1.5s ease-in-out infinite;
+      }
+
+      .initial-app-loader-card strong {
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .initial-app-loader-card span {
+        color: #a5b4cc;
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .initial-app-loader-bar {
+        width: 100%;
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.14);
+      }
+
+      .initial-app-loader-bar::after {
+        content: "";
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #7c3aed, #db2777);
+        animation: initial-loader-slide 1.15s ease-in-out infinite;
+      }
+
+      .initial-app-loader-retry {
+        display: none;
+        width: 100%;
+        min-height: 44px;
+        border: 0;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #111827;
+        font: inherit;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      #boot-loader.is-stalled .initial-app-loader-retry {
+        display: block;
+      }
+
+      #boot-loader.is-stalled .initial-app-loader-bar {
+        display: none;
+      }
+
+      @keyframes initial-loader-float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-4px);
+        }
+      }
+
+      @keyframes initial-loader-slide {
+        0% {
+          transform: translateX(-120%);
+        }
+        100% {
+          transform: translateX(340%);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .my-shows-page {
+          padding-bottom: calc(
+            var(--mobile-nav-height, 72px) + 32px + env(safe-area-inset-bottom)
+          ) !important;
+        }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-ltT8yOpI.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-CkUmIUYw.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-vendor-jY4wIOEF.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BzxQ-MWQ.css">
   </head>
   <body>
+    <div id="boot-loader" aria-live="polite" aria-busy="true">
+      <div class="initial-app-loader-card">
+        <div class="initial-app-loader-burger" aria-hidden="true">🍔</div>
+        <strong id="boot-loader-title">Loading BURGRS...</strong>
+        <span id="boot-loader-copy">Getting everything ready</span>
+        <div class="initial-app-loader-bar" aria-hidden="true"></div>
+        <button
+          class="initial-app-loader-retry"
+          type="button"
+          onclick="window.location.reload()"
+        >
+          Try again
+        </button>
+      </div>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      (function () {
+        var loader = document.getElementById("boot-loader");
+        var title = document.getElementById("boot-loader-title");
+        var copy = document.getElementById("boot-loader-copy");
+
+        window.__BURGRS_BOOT_ERROR__ = function () {
+          if (!loader) return;
+          loader.classList.add("is-stalled");
+          loader.setAttribute("aria-busy", "false");
+          if (title) title.textContent = "BURGRS did not finish loading";
+          if (copy) copy.textContent = "Tap below to reload the app.";
+        };
+
+        window.addEventListener("error", function (event) {
+          if (event && event.target && event.target !== window) {
+            window.__BURGRS_BOOT_ERROR__();
+          }
+        }, true);
+
+        window.addEventListener("unhandledrejection", function () {
+          window.__BURGRS_BOOT_ERROR__();
+        });
+
+        window.setTimeout(function () {
+          if (document.getElementById("boot-loader")) {
+            window.__BURGRS_BOOT_ERROR__();
+          }
+        }, 10000);
+      })();
+    </script>
+
   </body>
 </html>
