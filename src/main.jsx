@@ -66,6 +66,54 @@ import './show-page-polish.css'
 import './show-trailer-thumbnail.css'
 import './search-result-card-polish.css'
 
+const STALE_DEPLOY_RETRY_KEY = 'burgrs-stale-deploy-retry'
+const STALE_DEPLOY_RETRY_WINDOW_MS = 60_000
+
+function isStaleDeployError(error) {
+  const message = String(error?.message || error || '').toLowerCase()
+  return (
+    message.includes('failed to fetch dynamically imported module') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('importing a module script failed') ||
+    message.includes('chunkloaderror') ||
+    message.includes('loading chunk') ||
+    message.includes('preload')
+  )
+}
+
+function recoverFromStaleDeploy() {
+  const now = Date.now()
+  let lastRetry = 0
+
+  try {
+    lastRetry = Number(window.sessionStorage.getItem(STALE_DEPLOY_RETRY_KEY) || 0)
+  } catch {
+    // Session storage can be unavailable; the cache-busted reload still helps.
+  }
+
+  if (lastRetry && now - lastRetry < STALE_DEPLOY_RETRY_WINDOW_MS) {
+    return false
+  }
+
+  try {
+    window.sessionStorage.setItem(STALE_DEPLOY_RETRY_KEY, String(now))
+  } catch {
+    // Ignore storage failures.
+  }
+
+  const nextUrl = new URL(window.location.href)
+  nextUrl.searchParams.set('_burgr_update', String(now))
+  window.location.replace(nextUrl.toString())
+  return true
+}
+
+// Vite emits this event when an already-open tab requests an asset from an
+// older deploy. Recover before React falls through to the generic error UI.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  recoverFromStaleDeploy()
+})
+
 installNativeApiBridge()
 installNativeAuthLinks()
 installMobileOverscrollGuard()
@@ -141,6 +189,13 @@ function BootReady() {
     loader.style.transition = 'opacity 160ms ease'
 
     const timer = window.setTimeout(() => loader.remove(), 180)
+
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('_burgr_update')) {
+      url.searchParams.delete('_burgr_update')
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    }
+
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -150,7 +205,7 @@ function BootReady() {
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false }
+    this.state = { hasError: false, recovering: false }
   }
 
   static getDerivedStateFromError() {
@@ -159,9 +214,26 @@ class AppErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('BURGRS render failed:', error, info)
+
+    if (isStaleDeployError(error) && recoverFromStaleDeploy()) {
+      this.setState({ recovering: true })
+    }
   }
 
   render() {
+    if (this.state.recovering) {
+      return (
+        <main className="app-startup-loading" aria-live="polite" aria-busy="true">
+          <div className="app-startup-loading-card">
+            <div className="app-startup-loading-burger" aria-hidden="true">🍔</div>
+            <strong>Updating BURGRS...</strong>
+            <span>Loading the latest version</span>
+            <div className="app-startup-loading-bar" aria-hidden="true" />
+          </div>
+        </main>
+      )
+    }
+
     if (this.state.hasError) {
       return (
         <main className="app-startup-loading" role="alert">
