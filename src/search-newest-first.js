@@ -29,16 +29,45 @@ function isTitleSearchActive() {
   return activeMode?.textContent?.trim().toLowerCase() === 'title';
 }
 
-function getAliasText(card) {
+function getAliasRow(card) {
   const rows = Array.from(card.querySelectorAll('.search-result-meta-row'));
-  const aliasRow = rows.find((row) => {
+  return rows.find((row) => {
     const label = row.querySelector('.search-result-meta-label');
     return label?.textContent?.trim().toLowerCase() === 'also known as';
-  });
+  }) || null;
+}
 
-  return aliasRow
+function getAliasText(card) {
+  return getAliasRow(card)
     ?.querySelector('.search-result-meta-value')
     ?.textContent?.trim() || '';
+}
+
+function applyExactAliasDisplay(card, query) {
+  const normalizedQuery = normalizeTitle(query);
+  if (!normalizedQuery) return;
+
+  const aliasRow = getAliasRow(card);
+  if (!aliasRow) return;
+
+  const aliasValue = aliasRow
+    .querySelector('.search-result-meta-value')
+    ?.textContent?.trim() || '';
+
+  if (normalizeTitle(aliasValue) !== normalizedQuery) return;
+
+  const titleElement = card.querySelector('.search-result-title');
+  if (!titleElement) return;
+
+  const originalTitle = titleElement.textContent?.trim() || '';
+  if (!originalTitle || normalizeTitle(originalTitle) === normalizedQuery) return;
+
+  titleElement.textContent = aliasValue;
+
+  const labelElement = aliasRow.querySelector('.search-result-meta-label');
+  const valueElement = aliasRow.querySelector('.search-result-meta-value');
+  if (labelElement) labelElement.textContent = 'Original title';
+  if (valueElement) valueElement.textContent = originalTitle;
 }
 
 function getTitleMatchScore(card, query) {
@@ -65,6 +94,9 @@ function getTitleMatchScore(card, query) {
 
 function sortTitleResultsByRelevance(list, cards) {
   const query = document.querySelector('.search-page-input')?.value || '';
+
+  cards.forEach((card) => applyExactAliasDisplay(card, query));
+
   const sorted = [...cards].sort((a, b) => {
     const scoreDifference =
       getTitleMatchScore(b, query) - getTitleMatchScore(a, query);
