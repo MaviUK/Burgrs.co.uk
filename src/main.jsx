@@ -61,33 +61,6 @@ import './profile-final-pink-fixes.css'
 import './profile-tools-final-pink-fixes.css'
 import './login-final-pink-fixes.css'
 import './following-rating-plain-text.css'
-import './rankd-scroll-fix.js'
-import './rankd-social-share.js'
-import './dashboard-airing-link-fix.js'
-import './activity-share-buttons.js'
-import './rankd-guest-share-vote.js'
-import './rankd-shared-stats-fix.js'
-import './public-shared-content.js'
-import './show-data-refresh-button.js'
-import './dashboard-premiering-soon.js'
-import './dashboard-loading-screen.js'
-import './notification-nav-badge.js'
-import './notification-deep-links.js'
-import './notification-copy-cleanup.js'
-import './public-show-watch-providers.js'
-import './show-data-attribution.js'
-import './public-show-review-access.js'
-import './creator-profile-chats.js'
-import './creator-list-comments.js'
-import './following-list-card-consistency.js'
-import './creator-generated-banner.js'
-import './creator-profile-header-layout.js'
-import './header-profile-username-fix.js'
-import './creator-bio-limit.js'
-import './creator-rankd-list-button.js'
-import './studio-search-link-fix.js'
-import './search-newest-first.js'
-import './following-find-creators-link.js'
 
 installNativeApiBridge()
 installNativeAuthLinks()
@@ -96,6 +69,58 @@ installUserCacheIsolation()
 installDeletedUserRedirect(supabase)
 installSingleSessionEnforcement(supabase)
 installShowCommunityPortal(supabase)
+
+function loadDeferredEnhancements() {
+  return Promise.allSettled([
+    import('./rankd-scroll-fix.js'),
+    import('./rankd-social-share.js'),
+    import('./dashboard-airing-link-fix.js'),
+    import('./activity-share-buttons.js'),
+    import('./rankd-guest-share-vote.js'),
+    import('./rankd-shared-stats-fix.js'),
+    import('./public-shared-content.js'),
+    import('./show-data-refresh-button.js'),
+    import('./dashboard-premiering-soon.js'),
+    import('./dashboard-loading-screen.js'),
+    import('./notification-nav-badge.js'),
+    import('./notification-deep-links.js'),
+    import('./notification-copy-cleanup.js'),
+    import('./public-show-watch-providers.js'),
+    import('./show-data-attribution.js'),
+    import('./public-show-review-access.js'),
+    import('./creator-profile-chats.js'),
+    import('./creator-list-comments.js'),
+    import('./following-list-card-consistency.js'),
+    import('./creator-generated-banner.js'),
+    import('./creator-profile-header-layout.js'),
+    import('./header-profile-username-fix.js'),
+    import('./creator-bio-limit.js'),
+    import('./creator-rankd-list-button.js'),
+    import('./studio-search-link-fix.js'),
+    import('./search-newest-first.js'),
+    import('./following-find-creators-link.js'),
+  ])
+}
+
+function scheduleDeferredEnhancements() {
+  const load = () => {
+    loadDeferredEnhancements().then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected')
+      if (failed.length) {
+        console.warn(`Failed to load ${failed.length} deferred BURGRS enhancement(s).`)
+      }
+    })
+  }
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(load, { timeout: 1200 })
+    return
+  }
+
+  window.setTimeout(load, 250)
+}
+
+scheduleDeferredEnhancements()
 
 function BootReady() {
   React.useEffect(() => {
