@@ -15,16 +15,73 @@ function getFirstAiredTimestamp(card) {
   return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
 }
 
+function normalizeTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function isTitleSearchActive() {
   const activeMode = document.querySelector('.search-mode-button.is-active');
   return activeMode?.textContent?.trim().toLowerCase() === 'title';
 }
 
-function sortSearchResultsNewestFirst() {
-  // Title searches are ranked by relevance in the search API, including aliases.
-  // Do not override that ranking with a client-side newest-first sort.
-  if (isTitleSearchActive()) return;
+function getAliasText(card) {
+  const rows = Array.from(card.querySelectorAll('.search-result-meta-row'));
+  const aliasRow = rows.find((row) => {
+    const label = row.querySelector('.search-result-meta-label');
+    return label?.textContent?.trim().toLowerCase() === 'also known as';
+  });
 
+  return aliasRow
+    ?.querySelector('.search-result-meta-value')
+    ?.textContent?.trim() || '';
+}
+
+function getTitleMatchScore(card, query) {
+  const normalizedQuery = normalizeTitle(query);
+  if (!normalizedQuery) return 0;
+
+  const title = normalizeTitle(
+    card.querySelector('.search-result-title')?.textContent?.trim() || ''
+  );
+  const alias = normalizeTitle(getAliasText(card));
+
+  // Exact primary titles are best, followed immediately by exact aliases.
+  if (title === normalizedQuery) return 12000;
+  if (alias === normalizedQuery) return 11000;
+
+  if (title.startsWith(normalizedQuery)) return 6000;
+  if (alias.startsWith(normalizedQuery)) return 5500;
+
+  if (title.includes(normalizedQuery)) return 3000;
+  if (alias.includes(normalizedQuery)) return 2750;
+
+  return 0;
+}
+
+function sortTitleResultsByRelevance(list, cards) {
+  const query = document.querySelector('.search-page-input')?.value || '';
+  const sorted = [...cards].sort((a, b) => {
+    const scoreDifference =
+      getTitleMatchScore(b, query) - getTitleMatchScore(a, query);
+    if (scoreDifference !== 0) return scoreDifference;
+
+    const dateDifference = getFirstAiredTimestamp(b) - getFirstAiredTimestamp(a);
+    if (dateDifference !== 0) return dateDifference;
+
+    const aTitle = a.querySelector('.search-result-title')?.textContent?.trim() || '';
+    const bTitle = b.querySelector('.search-result-title')?.textContent?.trim() || '';
+    return aTitle.localeCompare(bTitle);
+  });
+
+  sorted.forEach((card) => list.appendChild(card));
+}
+
+function sortSearchResults() {
   const list = document.querySelector('.search-results-list');
   if (!list) return;
 
@@ -33,6 +90,11 @@ function sortSearchResultsNewestFirst() {
   );
 
   if (cards.length < 2) return;
+
+  if (isTitleSearchActive()) {
+    sortTitleResultsByRelevance(list, cards);
+    return;
+  }
 
   const sorted = [...cards].sort((a, b) => {
     const dateDifference = getFirstAiredTimestamp(b) - getFirstAiredTimestamp(a);
@@ -53,7 +115,7 @@ function scheduleSearchSort() {
 
   window.requestAnimationFrame(() => {
     scheduled = false;
-    sortSearchResultsNewestFirst();
+    sortSearchResults();
   });
 }
 
