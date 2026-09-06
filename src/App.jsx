@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -9,26 +9,27 @@ import {
 } from "react-router-dom";
 import "./index.css";
 import "./mobile-fixes.css";
-import ProfileEditMerged from "./pages/ProfileEditMerged";
-import CreatorProfile from "./pages/CreatorProfile";
-import CreatorListEditor from "./pages/CreatorListEditor";
-import CreatorPostEditor from "./pages/CreatorPostEditor";
-import FollowingFeed from "./pages/FollowingFeed";
-import Notifications from "./pages/Notifications";
-import Search from "./pages/Search";
-import Login from "./pages/Login";
-import SetPassword from "./pages/SetPassword";
-import ShowDetails from "./pages/ShowDetails";
-import MyShows from "./pages/MyShows";
-import MyShowDetails from "./pages/MyShowDetails";
-import Dashboard from "./pages/Dashboard";
-import CalendarPage from "./pages/CalendarPage";
-import ActorPage from "./pages/ActorPage";
-import Rankd from "./pages/Rankd";
 import BurgrsBanner from "./components/BurgrsBanner";
 import ProfileBlockButton from "./components/ProfileBlockButton";
 import { supabase } from "./lib/supabase";
 import { installMyShowWatchProgressFix } from "./lib/myShowWatchProgressFix";
+
+const ProfileEditMerged = lazy(() => import("./pages/ProfileEditMerged"));
+const CreatorProfile = lazy(() => import("./pages/CreatorProfile"));
+const CreatorListEditor = lazy(() => import("./pages/CreatorListEditor"));
+const CreatorPostEditor = lazy(() => import("./pages/CreatorPostEditor"));
+const FollowingFeed = lazy(() => import("./pages/FollowingFeed"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Search = lazy(() => import("./pages/Search"));
+const Login = lazy(() => import("./pages/Login"));
+const SetPassword = lazy(() => import("./pages/SetPassword"));
+const ShowDetails = lazy(() => import("./pages/ShowDetails"));
+const MyShows = lazy(() => import("./pages/MyShows"));
+const MyShowDetails = lazy(() => import("./pages/MyShowDetails"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+const ActorPage = lazy(() => import("./pages/ActorPage"));
+const Rankd = lazy(() => import("./pages/Rankd"));
 
 const HEADER_PROFILE_CACHE_PREFIX = "burgrs-header-profile:";
 
@@ -502,27 +503,29 @@ function AppLayout() {
       <ScrollToTopOnRouteChange />
       <MobileTopBanner session={session} profile={profile} />
 
-      <Routes key={routeUserKey}>
-        <Route path="/" element={<AuthRedirect session={session} />} />
-        <Route path="/login" element={<LoginRoute session={session} />} />
-        <Route path="/following" element={<ProtectedRoute session={session}><FollowingFeed /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute session={session}><Notifications /></ProtectedRoute>} />
-        <Route path="/u/:username" element={<CreatorProfile />} />
-        <Route path="/creator/lists/new" element={<ProtectedRoute session={session}><CreatorListEditor /></ProtectedRoute>} />
-        <Route path="/creator/posts/new" element={<ProtectedRoute session={session}><CreatorPostEditor /></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute session={session}><Search /></ProtectedRoute>} />
-        <Route path="/show/:id" element={<ShowDetails />} />
-        <Route path="/show/tmdb/:tmdbId" element={<ShowDetails />} />
-        <Route path="/my-shows" element={<ProtectedRoute session={session}><MyShows /></ProtectedRoute>} />
-        <Route path="/my-shows/:id" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
-        <Route path="/my-shows/tmdb/:tmdbId" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
-        <Route path="/actor/:name" element={<ProtectedRoute session={session}><ActorPage /></ProtectedRoute>} />
-        <Route path="/calendar" element={<ProtectedRoute session={session}><CalendarPage /></ProtectedRoute>} />
-        <Route path="/profile/edit" element={<ProtectedRoute session={session}><ProfileEditMerged /></ProtectedRoute>} />
-        <Route path="/rankd" element={<ProtectedRoute session={session}><Rankd /></ProtectedRoute>} />
-        <Route path="/rankd/share/:slug" element={<Rankd />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<AppStartupLoading />}>
+        <Routes key={routeUserKey}>
+          <Route path="/" element={<AuthRedirect session={session} />} />
+          <Route path="/login" element={<LoginRoute session={session} />} />
+          <Route path="/following" element={<ProtectedRoute session={session}><FollowingFeed /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute session={session}><Notifications /></ProtectedRoute>} />
+          <Route path="/u/:username" element={<CreatorProfile />} />
+          <Route path="/creator/lists/new" element={<ProtectedRoute session={session}><CreatorListEditor /></ProtectedRoute>} />
+          <Route path="/creator/posts/new" element={<ProtectedRoute session={session}><CreatorPostEditor /></ProtectedRoute>} />
+          <Route path="/search" element={<ProtectedRoute session={session}><Search /></ProtectedRoute>} />
+          <Route path="/show/:id" element={<ShowDetails />} />
+          <Route path="/show/tmdb/:tmdbId" element={<ShowDetails />} />
+          <Route path="/my-shows" element={<ProtectedRoute session={session}><MyShows /></ProtectedRoute>} />
+          <Route path="/my-shows/:id" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
+          <Route path="/my-shows/tmdb/:tmdbId" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
+          <Route path="/actor/:name" element={<ProtectedRoute session={session}><ActorPage /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute session={session}><CalendarPage /></ProtectedRoute>} />
+          <Route path="/profile/edit" element={<ProtectedRoute session={session}><ProfileEditMerged /></ProtectedRoute>} />
+          <Route path="/rankd" element={<ProtectedRoute session={session}><Rankd /></ProtectedRoute>} />
+          <Route path="/rankd/share/:slug" element={<Rankd />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
 
       <ProfileBlockButton />
       <MobileBottomNav session={session} />
