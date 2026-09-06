@@ -64,6 +64,7 @@ import './login-final-pink-fixes.css'
 import './following-rating-plain-text.css'
 import './show-page-polish.css'
 import './show-trailer-thumbnail.css'
+import './search-result-card-polish.css'
 
 installNativeApiBridge()
 installNativeAuthLinks()
@@ -105,6 +106,7 @@ function loadDeferredEnhancements() {
     import('./creator-rankd-list-button.js'),
     import('./studio-search-link-fix.js'),
     import('./search-newest-first.js'),
+    import('./search-result-card-polish.js'),
     import('./following-find-creators-link.js'),
   ])
 }
