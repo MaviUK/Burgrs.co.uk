@@ -177,7 +177,7 @@ function scoreResult(item, query) {
   if (Number.isFinite(year) && year >= 2010) best += 40;
   if (item?.image_url || item?.image) best += 20;
 
-  return { score: best, matched, matchType, variants };
+  return { score: best, matched, matchType };
 }
 
 function buildSearchTerms(query) {
@@ -219,6 +219,34 @@ async function searchTvdb(token, term) {
   );
 }
 
+async function fetchSeriesDetails(token, id) {
+  try {
+    const response = await fetch(
+      `https://api4.thetvdb.com/v4/series/${id}/extended?language=eng&meta=translations`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Accept-Language": "eng" } }
+    );
+    const body = await response.json();
+    return response.ok && body?.data ? body.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function mergeSearchAndDetails(searchItem, details) {
+  if (!details) return searchItem;
+  return {
+    ...details,
+    ...searchItem,
+    aliases: uniq([...aliasesFor(searchItem), ...aliasesFor(details)]),
+    translations: details.translations || searchItem.translations,
+    nameTranslations: details.nameTranslations || searchItem.nameTranslations,
+    overview: searchItem.overview || details.overview || "",
+    image_url: searchItem.image_url || searchItem.image || details.image || null,
+    image: searchItem.image || searchItem.image_url || details.image || null,
+    firstAired: searchItem.firstAired || searchItem.first_air_time || details.firstAired || null,
+  };
+}
+
 function normalizeResult(item, query) {
   const ranked = scoreResult(item, query);
   const translations = translationTitles(item);
@@ -234,6 +262,9 @@ function normalizeResult(item, query) {
       ? ranked.matched
       : null;
   const matchedAlias = exactMatchedAlias || alternateMatchedTitle;
+
+  const companies = Array.isArray(item?.companies) ? item.companies : [];
+  const companyName = displayValue(companies[0]);
 
   return {
     tvdb_id: Number(item?.tvdb_id || item?.id) || null,
@@ -252,7 +283,7 @@ function normalizeResult(item, query) {
     poster_url: item?.image_url || item?.image || null,
     network: displayValue(
       item?.network || item?.originalNetwork || item?.latestNetwork || item?.company
-    ) || null,
+    ) || companyName || null,
     genres: uniq(
       (Array.isArray(item?.genres) ? item.genres : [])
         .map((genre) => displayValue(genre))
@@ -282,7 +313,29 @@ export async function handler(event) {
       byId.set(id, item);
     });
 
-    const results = Array.from(byId.values())
+    const candidates = Array.from(byId.values());
+    const initialBatchIds = (batches[0] || [])
+      .slice(0, 8)
+      .map((item) => Number(item?.tvdb_id || item?.id))
+      .filter(Boolean);
+    const preliminaryIds = candidates
+      .map((item) => ({ id: Number(item?.tvdb_id || item?.id), score: scoreResult(item, query).score }))
+      .filter((item) => item.id)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((item) => item.id);
+    const detailIds = uniq([...initialBatchIds, ...preliminaryIds]).slice(0, 12);
+
+    const detailEntries = await Promise.all(
+      detailIds.map(async (id) => [Number(id), await fetchSeriesDetails(token, id)])
+    );
+    const detailsById = new Map(detailEntries);
+
+    const results = candidates
+      .map((item) => {
+        const id = Number(item?.tvdb_id || item?.id);
+        return mergeSearchAndDetails(item, detailsById.get(id));
+      })
       .map((item) => normalizeResult(item, query))
       .filter((item) => item.tvdb_id && item._score >= 1800)
       .sort((a, b) => {
