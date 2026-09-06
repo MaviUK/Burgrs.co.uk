@@ -1,56 +1,19 @@
-/* Cast and crew page mobile alignment fixes */
+/* Actor page mobile layout now lives in pages/ActorPage.css.
+   Keep this file limited to safe global spacing guards. */
 
 @media (max-width: 768px) {
   .actor-page {
-    padding-top: 24px;
+    padding-top: 22px;
   }
 
-  .actor-show-banner-inner {
-    grid-template-columns: 80px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-    padding: 14px;
-    min-height: 160px;
-  }
-
-  .actor-show-poster-wrap,
-  .actor-show-poster-link {
-    width: 80px;
-  }
-
-  .actor-show-poster {
-    width: 80px;
-    height: 116px;
-    border-radius: 14px;
-  }
-
-  .actor-show-title {
-    font-size: 1.08rem;
+  .actor-show-banner-card {
+    background-image: none !important;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 390px) {
   .actor-page {
-    padding-top: 24px;
-  }
-
-  .actor-show-banner-inner {
-    grid-template-columns: 72px minmax(0, 1fr);
-    gap: 12px;
-    min-height: 154px;
-  }
-
-  .actor-show-poster-wrap,
-  .actor-show-poster-link {
-    width: 72px;
-  }
-
-  .actor-show-poster {
-    width: 72px;
-    height: 104px;
-  }
-
-  .actor-show-title {
-    font-size: 1rem;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
