@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v7_SMART_HOME";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v8_RECENT_WATCH";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 60 * 24;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -181,7 +181,7 @@ async function fetchAllWatchedEpisodeRows(userId) {
   while (!done) {
     const { data, error } = await supabase
       .from("watched_episodes")
-      .select("episode_id")
+      .select("episode_id, watched_at")
       .eq("user_id", userId)
       .range(from, from + pageSize - 1);
 
@@ -311,16 +311,31 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     });
 
   const episodesByShow = new Map();
+  const regularEpisodeById = new Map();
   regularEpisodes.forEach((episode) => {
     const key = String(episode.show_id);
     if (!episodesByShow.has(key)) episodesByShow.set(key, []);
     episodesByShow.get(key).push(episode);
+    regularEpisodeById.set(String(episode.id), episode);
+  });
+
+  const latestWatchedAtByShow = new Map();
+  (watchedEpisodeRows || []).forEach((row) => {
+    const episode = regularEpisodeById.get(String(row?.episode_id || ""));
+    if (!episode) return;
+
+    const timestamp = new Date(row?.watched_at || 0).getTime() || 0;
+    const showKey = String(episode.show_id);
+    if (timestamp > (latestWatchedAtByShow.get(showKey) || 0)) {
+      latestWatchedAtByShow.set(showKey, timestamp);
+    }
   });
 
   const continueWatching = visibleShows
     .filter((show) => normalizeStatus(show.watch_status) === "watching")
     .map((show) => {
-      const showEpisodes = episodesByShow.get(String(show.show_id)) || [];
+      const showKey = String(show.show_id);
+      const showEpisodes = episodesByShow.get(showKey) || [];
       const airedEpisodes = showEpisodes.filter((episode) => episode.aired && hasAired(episode.aired));
       const watchedCount = airedEpisodes.filter((episode) => watchedIds.has(String(episode.id))).length;
       const nextEpisode = airedEpisodes.find((episode) => !watchedIds.has(String(episode.id)));
@@ -331,13 +346,17 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
         episode: nextEpisode,
         watchedCount,
         totalAired: airedEpisodes.length,
+        lastWatchedAt: latestWatchedAtByShow.get(showKey) || 0,
         progress: airedEpisodes.length
           ? Math.round((watchedCount / airedEpisodes.length) * 100)
           : 0,
       };
     })
     .filter(Boolean)
-    .sort((a, b) => b.progress - a.progress)
+    .sort((a, b) => {
+      if (b.lastWatchedAt !== a.lastWatchedAt) return b.lastWatchedAt - a.lastWatchedAt;
+      return b.progress - a.progress;
+    })
     .slice(0, 8);
 
   const airingThisWeek = regularEpisodes
