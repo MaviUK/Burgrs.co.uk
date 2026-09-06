@@ -12,6 +12,7 @@ import { installUserCacheIsolation } from './lib/installUserCacheIsolation'
 import { installDeletedUserRedirect } from './lib/installDeletedUserRedirect'
 import { installSingleSessionEnforcement } from './lib/installSingleSessionEnforcement'
 import { installRegionAwareStreaming } from './lib/installRegionAwareStreaming'
+import { installGlobalPageLoadingTheme } from './global-page-loading'
 import './index.css'
 import './rankd-button-fixes.css'
 import './mobile-header-consistency.css'
@@ -22,7 +23,6 @@ import './public-shared-content.css'
 import './show-data-refresh-button.css'
 import './remove-show-data-refresh-button.css'
 import './dashboard-premiering-soon.css'
-import './dashboard-loading-screen.css'
 import './firefox-mobile-nav-fix.css'
 import './notification-alerts.css'
 import './public-show-watch-providers.css'
@@ -36,6 +36,7 @@ import './creator-profile-header-layout.css'
 import './header-profile-username-fix.css'
 import './creator-profile-loading.css'
 import './app-startup-loading.css'
+import './global-page-loading.css'
 import './creator-bio-limit.css'
 import './creator-rankd-list-button.css'
 import './actor-page-mobile-fixes.css'
@@ -122,6 +123,7 @@ installDeletedUserRedirect(supabase)
 installSingleSessionEnforcement(supabase)
 installRegionAwareStreaming()
 installShowCommunityPortal(supabase)
+installGlobalPageLoadingTheme()
 
 function loadDeferredEnhancements() {
   return Promise.allSettled([
@@ -134,7 +136,6 @@ function loadDeferredEnhancements() {
     import('./public-shared-content.js'),
     import('./show-data-refresh-button.js'),
     import('./dashboard-premiering-soon.js'),
-    import('./dashboard-loading-screen.js'),
     import('./notification-nav-badge.js'),
     import('./notification-deep-links.js'),
     import('./notification-copy-cleanup.js'),
