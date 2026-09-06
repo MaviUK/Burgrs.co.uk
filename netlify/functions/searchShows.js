@@ -77,12 +77,65 @@ function normalizeStringArray(value) {
           item.value ??
           item.setting ??
           item.relationship ??
+          item.title ??
+          item.alias ??
           null
         );
       }
       return null;
     })
     .filter(Boolean);
+}
+
+function dedupeByValue(values) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function extractAliases(series) {
+  if (!series || typeof series !== "object") return [];
+
+  const pools = [
+    series.aliases,
+    series.alias,
+    series.alternateNames,
+    series.alternate_names,
+    series.alternativeNames,
+    series.alternative_names,
+  ];
+
+  const aliases = [];
+
+  for (const pool of pools) {
+    if (Array.isArray(pool)) {
+      aliases.push(...normalizeStringArray(pool));
+    } else if (typeof pool === "string") {
+      aliases.push(pool);
+    } else if (pool && typeof pool === "object") {
+      aliases.push(...normalizeStringArray(Object.values(pool)));
+    }
+  }
+
+  return dedupeByValue(aliases);
+}
+
+function findMatchingAlias(show, query) {
+  const queryLower = String(query || "").trim().toLowerCase();
+  if (!queryLower) return null;
+
+  const aliases = normalizeStringArray(show?.aliases);
+  const exact = aliases.find((alias) => alias.toLowerCase() === queryLower);
+  if (exact) return exact;
+
+  const starts = aliases.find((alias) => alias.toLowerCase().startsWith(queryLower));
+  if (starts) return starts;
+
+  return aliases.find((alias) => alias.toLowerCase().includes(queryLower)) || null;
 }
 
 function normalizeNetwork(value) {
@@ -166,6 +219,10 @@ function dedupeByTvdbId(items) {
     }
 
     const existing = map.get(item.tvdb_id);
+    const aliases = dedupeByValue([
+      ...normalizeStringArray(existing.aliases),
+      ...normalizeStringArray(item.aliases),
+    ]);
 
     const existingScore =
       (existing.image_url ? 1 : 0) +
@@ -184,21 +241,13 @@ function dedupeByTvdbId(items) {
       (item.original_language ? 1 : 0);
 
     if (nextScore >= existingScore) {
-      map.set(item.tvdb_id, item);
+      map.set(item.tvdb_id, { ...existing, ...item, aliases });
+    } else {
+      map.set(item.tvdb_id, { ...item, ...existing, aliases });
     }
   }
 
   return Array.from(map.values());
-}
-
-function dedupeByValue(values) {
-  return Array.from(
-    new Set(
-      values
-        .map((value) => String(value || "").trim())
-        .filter(Boolean)
-    )
-  );
 }
 
 function extractEnglishTranslationValue(translations, key) {
@@ -301,6 +350,7 @@ function normalizeSearchResult(item) {
       normalizedItem?.name ||
       normalizedItem?.seriesName ||
       "Unknown title",
+    aliases: extractAliases(normalizedItem),
     overview:
       normalizedItem?.english_overview ||
       extractEnglishTranslationValue(normalizedItem?.translations, "overview") ||
@@ -422,6 +472,7 @@ function normalizeSeriesDetails(series) {
       extractEnglishTranslationValue(series?.translations, "name") ||
       series?.name ||
       "Unknown title",
+    aliases: extractAliases(series),
     overview:
       extractEnglishTranslationValue(series?.translations, "overview") ||
       series?.overview ||
@@ -607,6 +658,10 @@ async function searchTvdb(token, term) {
           ? {
               ...item,
               ...detailed,
+              aliases: dedupeByValue([
+                ...normalizeStringArray(item.aliases),
+                ...normalizeStringArray(detailed.aliases),
+              ]),
               tvdb_id: item.tvdb_id,
             }
           : item;
@@ -657,6 +712,7 @@ function scoreShow(show, options) {
 
   const name = String(show.name || "").toLowerCase();
   const overview = String(show.overview || "").toLowerCase();
+  const aliases = normalizeStringArray(show.aliases).map((alias) => alias.toLowerCase());
   const showGenres = normalizeGenres(show.genres).map((g) => g.toLowerCase());
   const showNetwork = String(show.network || "").toLowerCase();
   const showRelationshipTypes = normalizeStringArray(
@@ -675,9 +731,13 @@ function scoreShow(show, options) {
 
   if (query) {
     const queryLower = query.toLowerCase();
-    if (name === queryLower) score += 100;
+    if (name === queryLower) score += 120;
     else if (name.startsWith(queryLower)) score += 40;
     else if (name.includes(queryLower)) score += 20;
+
+    if (aliases.some((alias) => alias === queryLower)) score += 115;
+    else if (aliases.some((alias) => alias.startsWith(queryLower))) score += 36;
+    else if (aliases.some((alias) => alias.includes(queryLower))) score += 18;
 
     if (overview.includes(queryLower)) score += 6;
   }
@@ -829,6 +889,7 @@ export async function handler(event) {
       const ranked = dedupeByTvdbId(tvdbResults)
         .map((item) => ({
           ...item,
+          matched_alias: findMatchingAlias(item, query),
           _score: scoreShow(item, {
             query,
             genre: "",
@@ -882,7 +943,18 @@ export async function handler(event) {
     const enriched = [];
     for (const candidate of candidates.slice(0, 40)) {
       const details = await fetchSeriesDetails(token, candidate.tvdb_id);
-      enriched.push(details || candidate);
+      enriched.push(
+        details
+          ? {
+              ...candidate,
+              ...details,
+              aliases: dedupeByValue([
+                ...normalizeStringArray(candidate.aliases),
+                ...normalizeStringArray(details.aliases),
+              ]),
+            }
+          : candidate
+      );
     }
 
     let results = dedupeByTvdbId(enriched);
@@ -1002,6 +1074,7 @@ export async function handler(event) {
       results
         .map((item) => ({
           ...item,
+          matched_alias: query ? findMatchingAlias(item, query) : null,
           _score: scoreShow(item, {
             query,
             genre,
