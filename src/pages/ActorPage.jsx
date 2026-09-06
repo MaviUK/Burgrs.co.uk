@@ -80,15 +80,15 @@ function getResolvedTmdbId(show) {
   return value ? String(value) : null;
 }
 
-function getShowDestination(show, alreadySaved) {
+function getShowDestination(show, savedByTvdb, savedByTmdb) {
   const tvdbId = getResolvedTvdbId(show);
   const tmdbId = getResolvedTmdbId(show);
 
-  if (alreadySaved && tvdbId) {
+  if (savedByTvdb && tvdbId) {
     return `/my-shows/${tvdbId}`;
   }
 
-  if (alreadySaved && tmdbId) {
+  if (savedByTmdb && tmdbId) {
     return `/my-shows/tmdb/${tmdbId}`;
   }
 
@@ -139,9 +139,9 @@ export default function ActorPage() {
     const { data, error: savedError } = await supabase
       .from("user_shows_new")
       .select(`
-        tmdb_id,
         shows!inner(
-          tvdb_id
+          tvdb_id,
+          tmdb_id
         )
       `)
       .eq("user_id", userId);
@@ -165,7 +165,7 @@ export default function ActorPage() {
 
     const tmdbIds = new Set(
       (data || [])
-        .map((row) => row?.tmdb_id)
+        .map((row) => row?.shows?.tmdb_id)
         .filter(Boolean)
         .map(String)
     );
@@ -519,14 +519,20 @@ export default function ActorPage() {
                 const resolvedTvdbId = getResolvedTvdbId(show);
                 const resolvedTmdbId = getResolvedTmdbId(show);
 
-                const alreadySaved =
-                  (resolvedTvdbId &&
-                    savedTvdbLookup.has(String(resolvedTvdbId))) ||
-                  (resolvedTmdbId &&
-                    savedTmdbLookup.has(String(resolvedTmdbId)));
+                const savedByTvdb = Boolean(
+                  resolvedTvdbId && savedTvdbLookup.has(String(resolvedTvdbId))
+                );
+                const savedByTmdb = Boolean(
+                  resolvedTmdbId && savedTmdbLookup.has(String(resolvedTmdbId))
+                );
+                const alreadySaved = savedByTvdb || savedByTmdb;
 
                 const canAdd = Boolean(resolvedTvdbId || resolvedTmdbId);
-                const destinationHref = getShowDestination(show, alreadySaved);
+                const destinationHref = getShowDestination(
+                  show,
+                  savedByTvdb,
+                  savedByTmdb
+                );
 
                 const showKey =
                   resolvedTvdbId ||
