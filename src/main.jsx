@@ -11,6 +11,7 @@ import { installMobileOverscrollGuard } from './lib/installMobileOverscrollGuard
 import { installUserCacheIsolation } from './lib/installUserCacheIsolation'
 import { installDeletedUserRedirect } from './lib/installDeletedUserRedirect'
 import { installSingleSessionEnforcement } from './lib/installSingleSessionEnforcement'
+import { installRegionAwareStreaming } from './lib/installRegionAwareStreaming'
 import './index.css'
 import './rankd-button-fixes.css'
 import './mobile-header-consistency.css'
@@ -68,6 +69,7 @@ installMobileOverscrollGuard()
 installUserCacheIsolation()
 installDeletedUserRedirect(supabase)
 installSingleSessionEnforcement(supabase)
+installRegionAwareStreaming()
 installShowCommunityPortal(supabase)
 
 function loadDeferredEnhancements() {
