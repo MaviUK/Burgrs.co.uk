@@ -74,7 +74,17 @@ async function enhanceTrailer() {
     button.target = "_blank";
     button.rel = "noreferrer";
     button.setAttribute("aria-label", "Watch trailer");
-    button.textContent = "▶ Trailer";
+
+    const icon = document.createElement("span");
+    icon.className = "burgr-thumb-trailer-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "▶";
+
+    const label = document.createElement("span");
+    label.className = "burgr-thumb-trailer-label";
+    label.textContent = "Trailer";
+
+    button.append(icon, label);
     thumb.insertAdjacentElement("afterend", button);
   }
 
