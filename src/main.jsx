@@ -90,6 +90,7 @@ function loadDeferredEnhancements() {
     import('./notification-copy-cleanup.js'),
     import('./public-show-watch-providers.js'),
     import('./show-page-polish.js'),
+    import('./specials-collapse.js'),
     import('./show-data-attribution.js'),
     import('./public-show-review-access.js'),
     import('./creator-profile-chats.js'),
