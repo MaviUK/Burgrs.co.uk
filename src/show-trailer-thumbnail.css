@@ -1,0 +1,51 @@
+/* Replace the oversized Up Next/progress card with a compact trailer action. */
+.burgr-show-spotlight {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .msd-page .msd-mobile-top-row.burgr-has-thumb-trailer {
+    min-height: 122px !important;
+  }
+
+  .burgr-thumb-trailer {
+    position: absolute;
+    top: 84px;
+    right: 0;
+    z-index: 4;
+    width: 102px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 999px;
+    background: #d5005b;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 900;
+    text-decoration: none;
+    box-shadow: 0 7px 18px rgba(151, 7, 71, 0.24);
+    white-space: nowrap;
+  }
+
+  .burgr-thumb-trailer:active {
+    transform: translateY(1px);
+  }
+}
+
+@media (max-width: 390px) {
+  .msd-page .msd-mobile-top-row.burgr-has-thumb-trailer {
+    min-height: 114px !important;
+  }
+
+  .burgr-thumb-trailer {
+    top: 78px;
+    width: 92px;
+    min-height: 30px;
+    font-size: 11px;
+  }
+}
