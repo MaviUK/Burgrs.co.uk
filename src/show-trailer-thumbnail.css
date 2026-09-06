@@ -14,26 +14,53 @@
     right: 0;
     z-index: 4;
     width: 102px;
-    min-height: 32px;
+    min-height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 7px;
     box-sizing: border-box;
-    padding: 0 8px;
-    border: 0;
-    border-radius: 999px;
-    background: #d5005b;
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(12, 17, 31, 0.94);
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
-    font-weight: 900;
+    font-weight: 850;
+    letter-spacing: 0.01em;
     text-decoration: none;
-    box-shadow: 0 7px 18px rgba(151, 7, 71, 0.24);
+    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     white-space: nowrap;
+    transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+  }
+
+  .burgr-thumb-trailer-icon {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #b0004d;
+    color: #fff;
+    font-size: 9px;
+    line-height: 1;
+    padding-left: 1px;
+    box-shadow: 0 3px 9px rgba(176, 0, 77, 0.28);
+  }
+
+  .burgr-thumb-trailer-label {
+    color: #fff;
   }
 
   .burgr-thumb-trailer:active {
-    transform: translateY(1px);
+    transform: translateY(1px) scale(0.98);
+    background: rgba(18, 25, 43, 0.98);
+    border-color: rgba(255, 255, 255, 0.24);
   }
 }
 
@@ -45,7 +72,16 @@
   .burgr-thumb-trailer {
     top: 78px;
     width: 92px;
-    min-height: 30px;
-    font-size: 11px;
+    min-height: 32px;
+    gap: 6px;
+    padding: 4px 7px;
+    font-size: 10.5px;
+  }
+
+  .burgr-thumb-trailer-icon {
+    flex-basis: 18px;
+    width: 18px;
+    height: 18px;
+    font-size: 8px;
   }
 }
