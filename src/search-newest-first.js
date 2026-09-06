@@ -1,3 +1,41 @@
+const nativeFetch = window.fetch.bind(window);
+
+if (!window.__burgrsSmartTitleFetchInstalled) {
+  window.__burgrsSmartTitleFetchInstalled = true;
+
+  window.fetch = (input, init) => {
+    try {
+      const rawUrl =
+        typeof input === 'string'
+          ? input
+          : input instanceof Request
+          ? input.url
+          : String(input || '');
+      const url = new URL(rawUrl, window.location.origin);
+      const isLegacyTitleSearch =
+        url.pathname.endsWith('/.netlify/functions/searchShows') &&
+        Boolean(url.searchParams.get('q')) &&
+        !url.searchParams.get('genre') &&
+        !url.searchParams.get('network') &&
+        !url.searchParams.get('relationshipType') &&
+        !url.searchParams.get('setting');
+
+      if (isLegacyTitleSearch) {
+        url.pathname = '/.netlify/functions/smartTitleSearch';
+        const nextUrl = `${url.pathname}${url.search}`;
+        if (input instanceof Request) {
+          return nativeFetch(new Request(nextUrl, input), init);
+        }
+        return nativeFetch(nextUrl, init);
+      }
+    } catch {
+      // Fall through to the original request.
+    }
+
+    return nativeFetch(input, init);
+  };
+}
+
 function getFirstAiredTimestamp(card) {
   const rows = Array.from(card.querySelectorAll('.search-result-meta-row'));
   const firstAiredRow = rows.find((row) => {
@@ -70,6 +108,32 @@ function applyExactAliasDisplay(card, query) {
   if (valueElement) valueElement.textContent = originalTitle;
 }
 
+function decorateResultYear(card) {
+  if (card.querySelector('.search-result-title-year')) return;
+  const timestamp = getFirstAiredTimestamp(card);
+  if (!Number.isFinite(timestamp) || timestamp === Number.NEGATIVE_INFINITY) return;
+
+  const year = new Date(timestamp).getFullYear();
+  if (!Number.isFinite(year) || year < 1900) return;
+
+  const title = card.querySelector('.search-result-title');
+  const link = card.querySelector('.search-result-title-link');
+  if (!title || !link) return;
+
+  link.style.display = 'flex';
+  link.style.alignItems = 'baseline';
+  link.style.gap = '8px';
+  link.style.flexWrap = 'wrap';
+
+  const yearElement = document.createElement('span');
+  yearElement.className = 'search-result-title-year';
+  yearElement.textContent = `(${year})`;
+  yearElement.style.color = 'rgba(255,255,255,0.62)';
+  yearElement.style.fontSize = '0.88rem';
+  yearElement.style.fontWeight = '700';
+  link.appendChild(yearElement);
+}
+
 function getTitleMatchScore(card, query) {
   const normalizedQuery = normalizeTitle(query);
   if (!normalizedQuery) return 0;
@@ -79,23 +143,22 @@ function getTitleMatchScore(card, query) {
   );
   const alias = normalizeTitle(getAliasText(card));
 
-  // Exact primary titles are best, followed immediately by exact aliases.
   if (title === normalizedQuery) return 12000;
   if (alias === normalizedQuery) return 11000;
-
   if (title.startsWith(normalizedQuery)) return 6000;
   if (alias.startsWith(normalizedQuery)) return 5500;
-
   if (title.includes(normalizedQuery)) return 3000;
   if (alias.includes(normalizedQuery)) return 2750;
-
   return 0;
 }
 
 function sortTitleResultsByRelevance(list, cards) {
   const query = document.querySelector('.search-page-input')?.value || '';
 
-  cards.forEach((card) => applyExactAliasDisplay(card, query));
+  cards.forEach((card) => {
+    applyExactAliasDisplay(card, query);
+    decorateResultYear(card);
+  });
 
   const sorted = [...cards].sort((a, b) => {
     const scoreDifference =
@@ -120,6 +183,10 @@ function sortSearchResults() {
   const cards = Array.from(list.children).filter((child) =>
     child.classList?.contains('search-result-banner-card')
   );
+
+  if (cards.length < 1) return;
+
+  cards.forEach(decorateResultYear);
 
   if (cards.length < 2) return;
 
@@ -150,6 +217,22 @@ function scheduleSearchSort() {
     sortSearchResults();
   });
 }
+
+let liveSearchTimer = null;
+document.addEventListener('input', (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  if (!input.matches('.search-page-input') || !isTitleSearchActive()) return;
+
+  window.clearTimeout(liveSearchTimer);
+  const value = input.value.trim();
+  if (value.length < 3) return;
+
+  liveSearchTimer = window.setTimeout(() => {
+    const button = document.querySelector('.search-page-button');
+    if (button instanceof HTMLButtonElement && !button.disabled) button.click();
+  }, 500);
+});
 
 const observer = new MutationObserver((mutations) => {
   const searchChanged = mutations.some((mutation) => {
