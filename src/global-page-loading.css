@@ -1,5 +1,4 @@
-/* Shared loading presentation for every BURGRS page. */
-
+/* Shared BURGRS loader chrome; the skeleton underneath mirrors each route. */
 .burgr-page-loader-overlay {
   --burgr-progress: 28.8deg;
   position: fixed;
@@ -19,252 +18,169 @@ body:has(.mobile-top-banner-wrap) .burgr-page-loader-overlay {
   bottom: calc(var(--mobile-nav-height, 72px) + env(safe-area-inset-bottom));
 }
 
-.burgr-page-loader-overlay.is-finishing {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.burgr-page-loader-template {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  padding: 18px 12px 24px;
-}
-
-.burgr-page-loader-template-inner {
-  width: min(100%, 760px);
-  margin: 0 auto;
-}
-
-.burgr-page-loader-heading {
-  width: 42%;
-  height: 24px;
-  margin: 4px 0 16px;
-  border-radius: 999px;
-}
-
-.burgr-page-loader-subheading {
-  width: 68%;
-  height: 12px;
-  margin: -8px 0 18px;
-  border-radius: 999px;
-}
+.burgr-page-loader-overlay.is-finishing { opacity: 0; pointer-events: none; }
+.burgr-page-loader-template { position: absolute; inset: 0; overflow: hidden; padding: 18px 12px 26px; }
+.burgr-page-loader-template-inner { width: min(100%, 760px); margin: 0 auto; }
 
 .burgr-page-loader-shimmer {
   background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.085), transparent)
-      -180px 0 / 180px 100% no-repeat,
+    linear-gradient(90deg, transparent, rgba(255,255,255,.085), transparent) -180px 0 / 180px 100% no-repeat,
     #182235;
   animation: burgr-page-loader-shimmer 1.35s linear infinite;
 }
 
-.burgr-page-loader-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
+.burgr-page-loader-line { border-radius: 999px; margin-bottom: 8px; }
+.burgr-page-loader-circle { flex: 0 0 auto; border-radius: 50%; }
+.burgr-page-loader-poster { aspect-ratio: 2 / 3; border-radius: 12px; }
+.burgr-page-loader-chip { height: 28px; flex: 0 0 auto; border-radius: 999px; }
+.burgr-loader-title { margin: 3px 0 16px; }
+.burgr-loader-section { margin: 0 0 18px; }
+.burgr-loader-section > .burgr-page-loader-line:first-child { margin-bottom: 11px; }
+.burgr-loader-tabs { display: flex; gap: 8px; overflow: hidden; margin: 0 0 14px; }
+.burgr-loader-page-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.burgr-loader-page-head > .burgr-page-loader-line { margin: 0; }
+.burgr-loader-button-row { display: flex; gap: 8px; margin: 12px 0; }
 
-.burgr-page-loader-grid-card {
-  aspect-ratio: 2 / 3;
-  border-radius: 13px;
-}
-
-.burgr-page-loader-list {
+.burgr-page-loader-row {
   display: grid;
-  gap: 10px;
-}
-
-.burgr-page-loader-list-card {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0,1fr);
   align-items: center;
-  gap: 12px;
-  min-height: 82px;
-  padding: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: 17px;
-  background: rgba(255, 255, 255, 0.035);
+  gap: 11px;
+  min-height: 76px;
+  padding: 9px;
+  border: 1px solid rgba(148,163,184,.1);
+  border-radius: 16px;
+  background: rgba(255,255,255,.035);
 }
+.burgr-page-loader-row.is-wide { min-height: 84px; }
+.burgr-page-loader-thumb { width: 54px; height: 58px; border-radius: 9px; }
+.burgr-page-loader-row-copy { min-width: 0; }
+.burgr-page-loader-row-copy .burgr-page-loader-line:last-child { margin-bottom: 0; }
+.burgr-loader-list { display: grid; gap: 9px; }
 
-.burgr-page-loader-list-poster {
-  width: 58px;
-  height: 62px;
-  border-radius: 10px;
-}
+/* HOME: horizontal continue-watching cards, stats, then upcoming rows. */
+.burgr-loader-horizontal-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.burgr-loader-continue-card { min-width: 0; overflow: hidden; border-radius: 16px; background: rgba(255,255,255,.035); }
+.burgr-loader-continue-card .burgr-page-loader-poster { width: 100%; border-radius: 0; }
+.burgr-loader-card-copy { padding: 9px; }
+.burgr-loader-stats-strip { display: grid; grid-template-columns: repeat(4,minmax(88px,1fr)); gap: 8px; overflow: hidden; margin: 0 0 18px; }
+.burgr-loader-stat { padding: 11px; border-radius: 15px; background: rgba(255,255,255,.045); }
 
-.burgr-page-loader-lines {
-  min-width: 0;
-}
+/* FOLLOWING: social feed cards with author, media and actions. */
+.burgr-loader-feed { display: grid; gap: 12px; }
+.burgr-loader-feed-card,
+.burgr-loader-profile-post { padding: 12px; border: 1px solid rgba(148,163,184,.1); border-radius: 18px; background: rgba(255,255,255,.035); }
+.burgr-loader-feed-author { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 10px; align-items: center; margin-bottom: 10px; }
+.burgr-loader-feed-author > div:last-child { min-width: 0; }
+.burgr-loader-feed-media { height: 132px; margin: 10px 0; border-radius: 14px; }
+.burgr-loader-feed-actions { display: flex; gap: 8px; }
 
-.burgr-page-loader-line {
-  height: 12px;
-  margin-bottom: 9px;
-  border-radius: 999px;
-}
+/* NOTIFICATIONS: compact avatar-led alert rows. */
+.burgr-loader-notification-list { display: grid; gap: 2px; }
+.burgr-loader-notification-row { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 11px; align-items: center; min-height: 68px; padding: 10px 4px; border-bottom: 1px solid rgba(148,163,184,.09); }
 
-.burgr-page-loader-line:last-child {
-  margin-bottom: 0;
-}
+/* SEARCH: real search bar shape and horizontal result cards. */
+.burgr-loader-search-box { width: 100%; height: 46px; margin: 0 0 11px; border-radius: 14px; }
+.burgr-loader-search-box.is-small { height: 42px; margin-bottom: 14px; }
+.burgr-loader-search-results { display: grid; gap: 10px; }
+.burgr-loader-search-result { display: grid; grid-template-columns: 82px minmax(0,1fr); gap: 12px; padding: 10px; border-radius: 17px; background: rgba(255,255,255,.035); }
+.burgr-loader-search-result .burgr-page-loader-poster { width: 82px; }
 
-.burgr-page-loader-line:nth-child(1) { width: 58%; }
-.burgr-page-loader-line:nth-child(2) { width: 82%; }
-.burgr-page-loader-line:nth-child(3) { width: 42%; }
+/* MY SHOWS: filters + search + dense poster wall. */
+.burgr-page-loader-poster-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
 
-.burgr-page-loader-hero {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 14px;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.035);
-}
+/* SHOW / MY SHOW: backdrop, poster hero, actions, tabs and episodes. */
+.burgr-loader-backdrop { height: 132px; margin: -18px -12px 0; border-radius: 0 0 22px 22px; opacity: .9; }
+.burgr-loader-show-hero { display: grid; grid-template-columns: 94px minmax(0,1fr); gap: 13px; align-items: end; margin-top: -45px; padding: 0 8px 14px; position: relative; }
+.burgr-page-loader-poster.is-hero { width: 94px; box-shadow: 0 12px 32px rgba(0,0,0,.32); }
+.burgr-loader-show-copy { min-width: 0; padding: 46px 0 0; }
+.burgr-loader-season-select { width: 132px; height: 36px; margin: 0 0 11px; border-radius: 11px; }
+.burgr-loader-episodes { display: grid; gap: 8px; }
+.burgr-loader-show .burgr-page-loader-thumb { width: 64px; height: 42px; }
+.burgr-loader-show .burgr-page-loader-row,
+.burgr-loader-show.is-saved .burgr-page-loader-row { grid-template-columns: 64px minmax(0,1fr); }
 
-.burgr-page-loader-hero-poster {
-  width: 92px;
-  height: 132px;
-  border-radius: 14px;
-}
+/* ACTOR: portrait identity, biography, known-for posters, credits. */
+.burgr-loader-actor-head { display: grid; justify-items: center; padding: 5px 0 16px; }
+.burgr-loader-actor-head .burgr-page-loader-line { margin-top: 10px; }
+.burgr-page-loader-circle.is-actor { box-shadow: 0 14px 34px rgba(0,0,0,.28); }
+.burgr-loader-bio { padding: 12px; margin-bottom: 17px; border-radius: 16px; background: rgba(255,255,255,.035); }
+.burgr-loader-horizontal-posters { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin: 10px 0 19px; }
 
-.burgr-page-loader-hero-copy {
-  padding-top: 7px;
-}
+/* PROFILE: banner, overlapping avatar, actions, tabs and posts. */
+.burgr-loader-profile-banner { height: 128px; margin: -18px -12px 0; border-radius: 0 0 22px 22px; }
+.burgr-loader-profile-head { display: grid; grid-template-columns: 86px minmax(0,1fr); gap: 12px; align-items: end; margin-top: -38px; padding: 0 8px 10px; }
+.burgr-page-loader-circle.is-profile { box-shadow: 0 0 0 5px #0b1020; }
+.burgr-loader-profile-copy { min-width: 0; padding-bottom: 3px; }
+.burgr-loader-profile-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 0 8px 13px; }
+.burgr-loader-profile-post .burgr-loader-feed-media { height: 110px; }
 
-.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(1) {
-  width: 76%;
-  height: 20px;
-}
+/* CALENDAR: week strip followed by grouped days. */
+.burgr-loader-calendar-strip { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; margin: 13px 0 18px; }
+.burgr-loader-date { display: grid; justify-items: center; gap: 7px; padding: 8px 2px; border-radius: 13px; background: rgba(255,255,255,.035); }
+.burgr-loader-date .burgr-page-loader-line { margin: 0; }
+.burgr-loader-calendar-day { margin-bottom: 16px; }
+.burgr-loader-calendar-day > .burgr-page-loader-line { margin-bottom: 9px; }
 
-.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(2) { width: 54%; }
-.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(3) { width: 90%; }
-.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(4) { width: 70%; }
+/* RANK'D: controls and numbered ranking list. */
+.burgr-loader-rankd-controls { display: flex; gap: 8px; margin: 12px 0 15px; overflow: hidden; }
+.burgr-loader-rank-list { display: grid; gap: 8px; }
+.burgr-loader-rank-list .burgr-page-loader-row { grid-template-columns: 34px 54px minmax(0,1fr); }
+.burgr-page-loader-rank { width: 34px; height: 34px; border-radius: 50%; }
 
-.burgr-page-loader-template[data-template="grid"] .burgr-page-loader-list,
-.burgr-page-loader-template[data-template="grid"] .burgr-page-loader-hero {
-  display: none;
-}
+/* PROFILE EDIT / EDITORS: avatar and actual form field shapes. */
+.burgr-loader-edit-avatar { display: grid; justify-items: center; gap: 10px; margin: 18px 0; }
+.burgr-loader-form,
+.burgr-loader-editor { display: grid; gap: 14px; }
+.burgr-loader-field .burgr-page-loader-line { margin-bottom: 7px; }
+.burgr-loader-input { height: 46px; border-radius: 13px; }
+.burgr-loader-input.is-tall { height: 122px; }
+.burgr-loader-save { height: 44px; border-radius: 999px; margin-top: 4px; }
+.burgr-loader-editor .burgr-page-loader-poster-grid { margin-top: 4px; }
 
-.burgr-page-loader-template[data-template="list"] .burgr-page-loader-grid,
-.burgr-page-loader-template[data-template="list"] .burgr-page-loader-hero {
-  display: none;
-}
+/* LOGIN: centered auth card instead of app content. */
+.burgr-loader-login { min-height: calc(100svh - 110px); display: grid; place-items: center; }
+.burgr-loader-login-card { width: min(100%,340px); display: grid; gap: 12px; justify-items: center; padding: 24px 18px; border-radius: 24px; background: rgba(255,255,255,.04); border: 1px solid rgba(148,163,184,.12); }
+.burgr-loader-login-logo { width: 72px; height: 52px; border-radius: 18px; }
+.burgr-loader-login-card > .burgr-page-loader-line { margin-bottom: 3px; }
+.burgr-loader-login-card .burgr-loader-input,
+.burgr-loader-login-card .burgr-loader-save { width: 100%; }
 
-.burgr-page-loader-template[data-template="hero"] .burgr-page-loader-grid {
-  display: none;
-}
+/* Generic fallback only for routes with no dedicated template. */
+.burgr-loader-generic > .burgr-page-loader-line { margin-bottom: 16px; }
 
-.burgr-page-loader-template[data-template="hero"] .burgr-page-loader-list {
-  margin-top: 12px;
-}
-
+/* Shared burger percentage dial. */
 .burgr-page-loader-center {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  pointer-events: none;
+  left: 50%; top: 50%; transform: translate(-50%,-50%);
+  display: grid; justify-items: center; gap: 10px; pointer-events: none;
 }
-
 .burgr-page-loader-dial {
   position: relative;
-  width: 104px;
-  height: 104px;
-  display: grid;
-  place-items: center;
+  width: 104px; height: 104px;
+  display: grid; place-items: center;
   border-radius: 50%;
-  background: conic-gradient(
-    #d81470 0deg,
-    #ff5aa6 var(--burgr-progress),
-    rgba(148, 163, 184, 0.16) var(--burgr-progress),
-    rgba(148, 163, 184, 0.16) 360deg
-  );
-  box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: conic-gradient(#d81470 0deg,#ff5aa6 var(--burgr-progress),rgba(148,163,184,.16) var(--burgr-progress),rgba(148,163,184,.16) 360deg);
+  box-shadow: 0 18px 48px rgba(0,0,0,.38),0 0 0 1px rgba(255,255,255,.06);
 }
+.burgr-page-loader-dial::before { content:""; position:absolute; inset:7px; border-radius:50%; background:#0e1728; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+.burgr-page-loader-burger { position:relative; z-index:1; font-size:38px; line-height:1; filter:drop-shadow(0 5px 10px rgba(0,0,0,.28)); animation:burgr-page-loader-float 1.45s ease-in-out infinite; }
+.burgr-page-loader-percent { position:absolute; z-index:2; left:50%; bottom:15px; transform:translateX(-50%); min-width:40px; padding:2px 6px; border-radius:999px; background:rgba(7,17,31,.9); color:#f8fafc; font-size:11px; line-height:1.25; font-weight:950; text-align:center; }
+.burgr-page-loader-label { max-width:230px; color:#cbd5e1; font-size:13px; font-weight:850; text-align:center; text-shadow:0 3px 16px rgba(0,0,0,.5); }
+.burgr-page-loader-sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
-.burgr-page-loader-dial::before {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  border-radius: 50%;
-  background: #0e1728;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-}
+@keyframes burgr-page-loader-shimmer { 100% { background-position: calc(100% + 180px) 0,0 0; } }
+@keyframes burgr-page-loader-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
 
-.burgr-page-loader-burger {
-  position: relative;
-  z-index: 1;
-  font-size: 38px;
-  line-height: 1;
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.28));
-  animation: burgr-page-loader-float 1.45s ease-in-out infinite;
-}
-
-.burgr-page-loader-percent {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  bottom: 15px;
-  transform: translateX(-50%);
-  min-width: 40px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(7, 17, 31, 0.9);
-  color: #f8fafc;
-  font-size: 11px;
-  line-height: 1.25;
-  font-weight: 950;
-  text-align: center;
-  letter-spacing: 0.01em;
-}
-
-.burgr-page-loader-label {
-  max-width: 230px;
-  color: #cbd5e1;
-  font-size: 13px;
-  font-weight: 850;
-  text-align: center;
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.5);
-}
-
-.burgr-page-loader-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-@keyframes burgr-page-loader-shimmer {
-  100% { background-position: calc(100% + 180px) 0, 0 0; }
-}
-
-@keyframes burgr-page-loader-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-@media (max-width: 390px) {
-  .burgr-page-loader-dial {
-    width: 96px;
-    height: 96px;
-  }
-
-  .burgr-page-loader-burger { font-size: 35px; }
-  .burgr-page-loader-grid { gap: 8px; }
+@media (max-width:390px) {
+  .burgr-page-loader-dial { width:96px; height:96px; }
+  .burgr-page-loader-burger { font-size:35px; }
+  .burgr-page-loader-poster-grid,
+  .burgr-loader-horizontal-posters { gap:8px; }
+  .burgr-loader-horizontal-cards { gap:8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .burgr-page-loader-shimmer,
-  .burgr-page-loader-burger {
-    animation-duration: 2.4s;
-  }
+  .burgr-page-loader-burger { animation-duration:2.4s; }
 }
