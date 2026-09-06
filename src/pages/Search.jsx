@@ -551,6 +551,9 @@ export default function Search() {
                         src={poster}
                         alt={show.name || show.show_name || "Show poster"}
                         className="search-result-poster"
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
                       />
                     ) : (
                       <div className="search-result-poster search-result-poster-placeholder" />
