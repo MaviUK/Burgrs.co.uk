@@ -1,0 +1,270 @@
+/* Shared loading presentation for every BURGRS page. */
+
+.burgr-page-loader-overlay {
+  --burgr-progress: 28.8deg;
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(151, 7, 71, 0.16), transparent 34%),
+    linear-gradient(180deg, #09101d 0%, #0b1020 100%);
+  color: #f8fafc;
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+
+body:has(.mobile-top-banner-wrap) .burgr-page-loader-overlay {
+  top: calc(var(--mobile-fixed-header-height, 62px) + env(safe-area-inset-top));
+  bottom: calc(var(--mobile-nav-height, 72px) + env(safe-area-inset-bottom));
+}
+
+.burgr-page-loader-overlay.is-finishing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.burgr-page-loader-template {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 18px 12px 24px;
+}
+
+.burgr-page-loader-template-inner {
+  width: min(100%, 760px);
+  margin: 0 auto;
+}
+
+.burgr-page-loader-heading {
+  width: 42%;
+  height: 24px;
+  margin: 4px 0 16px;
+  border-radius: 999px;
+}
+
+.burgr-page-loader-subheading {
+  width: 68%;
+  height: 12px;
+  margin: -8px 0 18px;
+  border-radius: 999px;
+}
+
+.burgr-page-loader-shimmer {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.085), transparent)
+      -180px 0 / 180px 100% no-repeat,
+    #182235;
+  animation: burgr-page-loader-shimmer 1.35s linear infinite;
+}
+
+.burgr-page-loader-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.burgr-page-loader-grid-card {
+  aspect-ratio: 2 / 3;
+  border-radius: 13px;
+}
+
+.burgr-page-loader-list {
+  display: grid;
+  gap: 10px;
+}
+
+.burgr-page-loader-list-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.burgr-page-loader-list-poster {
+  width: 58px;
+  height: 62px;
+  border-radius: 10px;
+}
+
+.burgr-page-loader-lines {
+  min-width: 0;
+}
+
+.burgr-page-loader-line {
+  height: 12px;
+  margin-bottom: 9px;
+  border-radius: 999px;
+}
+
+.burgr-page-loader-line:last-child {
+  margin-bottom: 0;
+}
+
+.burgr-page-loader-line:nth-child(1) { width: 58%; }
+.burgr-page-loader-line:nth-child(2) { width: 82%; }
+.burgr-page-loader-line:nth-child(3) { width: 42%; }
+
+.burgr-page-loader-hero {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.burgr-page-loader-hero-poster {
+  width: 92px;
+  height: 132px;
+  border-radius: 14px;
+}
+
+.burgr-page-loader-hero-copy {
+  padding-top: 7px;
+}
+
+.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(1) {
+  width: 76%;
+  height: 20px;
+}
+
+.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(2) { width: 54%; }
+.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(3) { width: 90%; }
+.burgr-page-loader-hero-copy .burgr-page-loader-line:nth-child(4) { width: 70%; }
+
+.burgr-page-loader-template[data-template="grid"] .burgr-page-loader-list,
+.burgr-page-loader-template[data-template="grid"] .burgr-page-loader-hero {
+  display: none;
+}
+
+.burgr-page-loader-template[data-template="list"] .burgr-page-loader-grid,
+.burgr-page-loader-template[data-template="list"] .burgr-page-loader-hero {
+  display: none;
+}
+
+.burgr-page-loader-template[data-template="hero"] .burgr-page-loader-grid {
+  display: none;
+}
+
+.burgr-page-loader-template[data-template="hero"] .burgr-page-loader-list {
+  margin-top: 12px;
+}
+
+.burgr-page-loader-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.burgr-page-loader-dial {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    #d81470 0deg,
+    #ff5aa6 var(--burgr-progress),
+    rgba(148, 163, 184, 0.16) var(--burgr-progress),
+    rgba(148, 163, 184, 0.16) 360deg
+  );
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.burgr-page-loader-dial::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: #0e1728;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.burgr-page-loader-burger {
+  position: relative;
+  z-index: 1;
+  font-size: 38px;
+  line-height: 1;
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.28));
+  animation: burgr-page-loader-float 1.45s ease-in-out infinite;
+}
+
+.burgr-page-loader-percent {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 15px;
+  transform: translateX(-50%);
+  min-width: 40px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(7, 17, 31, 0.9);
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 950;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.burgr-page-loader-label {
+  max-width: 230px;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.5);
+}
+
+.burgr-page-loader-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes burgr-page-loader-shimmer {
+  100% { background-position: calc(100% + 180px) 0, 0 0; }
+}
+
+@keyframes burgr-page-loader-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@media (max-width: 390px) {
+  .burgr-page-loader-dial {
+    width: 96px;
+    height: 96px;
+  }
+
+  .burgr-page-loader-burger { font-size: 35px; }
+  .burgr-page-loader-grid { gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .burgr-page-loader-shimmer,
+  .burgr-page-loader-burger {
+    animation-duration: 2.4s;
+  }
+}
