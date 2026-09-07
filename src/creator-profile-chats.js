@@ -433,6 +433,12 @@ function syncCreatorChats() {
     return;
   }
 
+  if (["burgrs", "admin"].includes(slug.toLowerCase())) {
+    document.querySelector(`[${CHAT_BUTTON_ATTR}]`)?.remove();
+    restoreNativePanel();
+    return;
+  }
+
   const statsCard = document.querySelector(
     ".creator-stats-card.creator-stats-card-clickable"
   );

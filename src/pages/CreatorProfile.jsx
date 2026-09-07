@@ -5,6 +5,27 @@ import "./CreatorProfile.css";
 import "./CreatorListCards.css";
 import "./CreatorProfileStats.css";
 
+const SYSTEM_ADMIN_USERNAME = "burgrs";
+const SYSTEM_ADMIN_ALIASES = new Set([SYSTEM_ADMIN_USERNAME, "admin"]);
+const SYSTEM_ADMIN_PROFILE = Object.freeze({
+  id: "burgrs-system-admin",
+  username: SYSTEM_ADMIN_USERNAME,
+  display_name: "BURGRS Admin",
+  full_name: "BURGRS Admin",
+  avatar_url: "",
+  cover_url: "",
+  bio: "The official BURGRS system profile. It automatically includes every show in the database and treats every episode as watched.",
+  creator_tagline: "Every show. Every episode. Always complete.",
+  creator_niche: "Official system profile",
+  creator_bio: "This profile is generated directly from the BURGRS database, so new shows and episodes appear here automatically without needing manual updates.",
+  is_system_profile: true,
+});
+const SYSTEM_SHOW_PAGE_SIZE = 500;
+
+function isSystemAdminSlug(value) {
+  return SYSTEM_ADMIN_ALIASES.has(String(value || "").trim().toLowerCase());
+}
+
 function getName(profile) {
   return (
     profile?.display_name ||
@@ -191,7 +212,7 @@ function CreatorListCard({
                 <Link key={item.id} to={showHref(item)} className="creator-list-item">
                   <span className="creator-rank">#{item.rank}</span>
                   {item.poster_url ? (
-                    <img src={item.poster_url} alt="" />
+                    <img src={item.poster_url} alt="" loading="lazy" />
                   ) : (
                     <span className="creator-mini-poster">?</span>
                   )}
@@ -269,6 +290,7 @@ export default function CreatorProfile() {
   const [posts, setPosts] = useState([]);
   const [lists, setLists] = useState([]);
   const [rankedTopShows, setRankedTopShows] = useState([]);
+  const [systemStats, setSystemStats] = useState({ shows: 0, episodes: 0 });
   const [expandedListIds, setExpandedListIds] = useState(() => new Set());
 
   const isOwnProfile = useMemo(() => {
@@ -304,6 +326,78 @@ export default function CreatorProfile() {
       else next.add(listId);
       return next;
     });
+  }
+
+  async function fetchAllSystemShows() {
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error: showsError } = await supabase
+        .from("shows")
+        .select("id, tvdb_id, tmdb_id, name, first_aired, poster_url")
+        .order("name", { ascending: true })
+        .range(from, from + SYSTEM_SHOW_PAGE_SIZE - 1);
+
+      if (showsError) throw showsError;
+
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < SYSTEM_SHOW_PAGE_SIZE) break;
+      from += SYSTEM_SHOW_PAGE_SIZE;
+    }
+
+    return rows;
+  }
+
+  async function loadSystemAdminProfile() {
+    setProfile(SYSTEM_ADMIN_PROFILE);
+    setFollowersCount(0);
+    setFollowingCount(0);
+    setFollowers([]);
+    setFollowing([]);
+    setIsFollowing(false);
+    setMonetization(null);
+    setSubscription(null);
+    setPosts([]);
+    setReviews([]);
+    setRankedTopShows([]);
+
+    const [showRows, episodeResult] = await Promise.all([
+      fetchAllSystemShows(),
+      supabase.from("episodes").select("id", { count: "exact", head: true }),
+    ]);
+
+    if (episodeResult.error) throw episodeResult.error;
+
+    const episodeCount = Number(episodeResult.count || 0);
+    setSystemStats({ shows: showRows.length, episodes: episodeCount });
+
+    const items = showRows.map((show, index) => ({
+      id: `system-${show.id}`,
+      show_id: show.id,
+      rank: index + 1,
+      show_name: show.name || "Untitled show",
+      show_year: getShowYear(show),
+      poster_url: show.poster_url || "",
+      tmdb_id: show.tmdb_id || "",
+      tvdb_id: show.tvdb_id || "",
+      note: "Watched • Complete",
+    }));
+
+    setLists([
+      {
+        id: "system-all-shows",
+        title: "Every show on BURGRS",
+        subtitle: `${showRows.length.toLocaleString("en-GB")} shows • ${episodeCount.toLocaleString("en-GB")} episodes watched`,
+        badge: "Auto",
+        description:
+          "This system collection mirrors the BURGRS database automatically. Every show currently in the database is included, every episode is treated as watched, and future additions appear without manual maintenance.",
+        visibility: "public",
+        created_at: null,
+        items,
+      },
+    ]);
   }
 
   async function loadRankedTopShows(profileRow) {
@@ -507,6 +601,12 @@ export default function CreatorProfile() {
       setCurrentUser(user);
 
       const cleanUsername = decodeURIComponent(username || "").replace(/^@/, "");
+
+      if (isSystemAdminSlug(cleanUsername)) {
+        await loadSystemAdminProfile();
+        return;
+      }
+
       const profileSelect = `
         id,
         username,
@@ -798,6 +898,7 @@ export default function CreatorProfile() {
     );
   }
 
+  const isSystemProfile = Boolean(profile?.is_system_profile);
   const displayName = getName(profile);
   const handle = profile?.username ? `@${profile.username}` : "";
   const avatarUrl = profile?.avatar_url || "";
@@ -836,7 +937,11 @@ export default function CreatorProfile() {
           ) : null}
 
           <div className="creator-actions">
-            {isOwnProfile ? (
+            {isSystemProfile ? (
+              <span className="creator-btn creator-btn-secondary" aria-label="Official BURGRS system profile">
+                Official BURGRS profile
+              </span>
+            ) : isOwnProfile ? (
               <>
                 <Link to="/profile/edit" className="creator-btn creator-btn-secondary">
                   Edit profile
@@ -859,7 +964,7 @@ export default function CreatorProfile() {
               </button>
             )}
 
-            {!isOwnProfile ? (
+            {!isOwnProfile && !isSystemProfile ? (
               isSubscribed ? (
                 <button type="button" className="creator-btn creator-btn-secondary" disabled>
                   Subscribed
@@ -885,48 +990,80 @@ export default function CreatorProfile() {
 
       {error ? <p className="creator-error">{error}</p> : null}
 
-      <section className="creator-stats-card creator-stats-card-clickable" aria-label="Creator profile sections">
-        <button
-          type="button"
-          className={getStatButtonClass("followers")}
-          onClick={() => setActiveProfilePanel("followers")}
+      {isSystemProfile ? (
+        <section
+          className="creator-stats-card creator-stats-card-clickable creator-system-stats"
+          aria-label="BURGRS system profile stats"
         >
-          <strong>{followersCount}</strong>
-          <span>Followers</span>
-        </button>
-        <button
-          type="button"
-          className={getStatButtonClass("following")}
-          onClick={() => setActiveProfilePanel("following")}
-        >
-          <strong>{followingCount}</strong>
-          <span>Following</span>
-        </button>
-        <button
-          type="button"
-          className={getStatButtonClass("posts")}
-          onClick={() => setActiveProfilePanel("posts")}
-        >
-          <strong>{posts.length}</strong>
-          <span>Posts</span>
-        </button>
-        <button
-          type="button"
-          className={getStatButtonClass("lists")}
-          onClick={() => setActiveProfilePanel("lists")}
-        >
-          <strong>{listCount}</strong>
-          <span>Lists</span>
-        </button>
-        <button
-          type="button"
-          className={getStatButtonClass("reviews")}
-          onClick={() => setActiveProfilePanel("reviews")}
-        >
-          <strong>{reviews.length}</strong>
-          <span>Reviews</span>
-        </button>
-      </section>
+          <button
+            type="button"
+            className={getStatButtonClass("lists")}
+            onClick={() => setActiveProfilePanel("lists")}
+          >
+            <strong>{systemStats.shows.toLocaleString("en-GB")}</strong>
+            <span>Shows</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("lists")}
+            onClick={() => setActiveProfilePanel("lists")}
+          >
+            <strong>{systemStats.episodes.toLocaleString("en-GB")}</strong>
+            <span>Episodes watched</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("lists")}
+            onClick={() => setActiveProfilePanel("lists")}
+          >
+            <strong>100%</strong>
+            <span>Complete</span>
+          </button>
+        </section>
+      ) : (
+        <section className="creator-stats-card creator-stats-card-clickable" aria-label="Creator profile sections">
+          <button
+            type="button"
+            className={getStatButtonClass("followers")}
+            onClick={() => setActiveProfilePanel("followers")}
+          >
+            <strong>{followersCount}</strong>
+            <span>Followers</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("following")}
+            onClick={() => setActiveProfilePanel("following")}
+          >
+            <strong>{followingCount}</strong>
+            <span>Following</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("posts")}
+            onClick={() => setActiveProfilePanel("posts")}
+          >
+            <strong>{posts.length}</strong>
+            <span>Posts</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("lists")}
+            onClick={() => setActiveProfilePanel("lists")}
+          >
+            <strong>{listCount}</strong>
+            <span>Lists</span>
+          </button>
+          <button
+            type="button"
+            className={getStatButtonClass("reviews")}
+            onClick={() => setActiveProfilePanel("reviews")}
+          >
+            <strong>{reviews.length}</strong>
+            <span>Reviews</span>
+          </button>
+        </section>
+      )}
 
       {creatorBio ? (
         <section className="creator-card">
@@ -959,7 +1096,7 @@ export default function CreatorProfile() {
         {activeProfilePanel === "lists" ? (
           <>
             <div className="creator-section-head">
-              <h2>Creator lists</h2>
+              <h2>{isSystemProfile ? "System collection" : "Creator lists"}</h2>
               {isOwnProfile ? (
                 <Link to="/creator/lists/new" className="creator-small-link">
                   Create list
@@ -985,9 +1122,11 @@ export default function CreatorProfile() {
 
                 {lists.map((list) => {
                   const itemCount = list.items?.length || 0;
-                  const subtitle = `${itemCount} show${itemCount === 1 ? "" : "s"}${
-                    list.visibility === "private" ? " • Private draft" : ""
-                  }`;
+                  const subtitle =
+                    list.subtitle ||
+                    `${itemCount} show${itemCount === 1 ? "" : "s"}${
+                      list.visibility === "private" ? " • Private draft" : ""
+                    }`;
 
                   return (
                     <CreatorListCard
@@ -995,7 +1134,7 @@ export default function CreatorProfile() {
                       listId={list.id}
                       title={list.title}
                       subtitle={subtitle}
-                      badge={formatDate(list.created_at)}
+                      badge={list.badge || formatDate(list.created_at)}
                       description={list.description}
                       items={list.items || []}
                       isExpanded={expandedListIds.has(list.id)}
