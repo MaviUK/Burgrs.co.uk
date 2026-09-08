@@ -14,10 +14,10 @@ const SYSTEM_ADMIN_PROFILE = Object.freeze({
   full_name: "BURGRS Admin",
   avatar_url: "",
   cover_url: "",
-  bio: "The official BURGRS system profile. It automatically includes every show in the database and treats every episode as watched.",
-  creator_tagline: "Every show. Every episode. Always complete.",
+  bio: "The official BURGRS system profile. It automatically includes every show in the database, treats every episode as watched, and follows every creator.",
+  creator_tagline: "Every show. Every episode. Every creator.",
   creator_niche: "Official system profile",
-  creator_bio: "This profile is generated directly from the BURGRS database, so new shows and episodes appear here automatically without needing manual updates.",
+  creator_bio: "This profile is generated directly from the BURGRS database, so new shows, episodes and creator profiles appear here automatically without needing manual updates.",
   is_system_profile: true,
 });
 const SYSTEM_SHOW_PAGE_SIZE = 500;
@@ -350,6 +350,31 @@ export default function CreatorProfile() {
     return rows;
   }
 
+  async function fetchAllSystemCreators() {
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, display_name, avatar_url")
+        .not("username", "is", null)
+        .order("username", { ascending: true })
+        .range(from, from + SYSTEM_SHOW_PAGE_SIZE - 1);
+
+      if (profilesError) throw profilesError;
+
+      const page = data || [];
+      rows.push(
+        ...page.filter((profileRow) => String(profileRow?.username || "").trim())
+      );
+      if (page.length < SYSTEM_SHOW_PAGE_SIZE) break;
+      from += SYSTEM_SHOW_PAGE_SIZE;
+    }
+
+    return rows;
+  }
+
   async function loadSystemAdminProfile() {
     setProfile(SYSTEM_ADMIN_PROFILE);
     setFollowersCount(0);
@@ -363,8 +388,9 @@ export default function CreatorProfile() {
     setReviews([]);
     setRankedTopShows([]);
 
-    const [showRows, episodeResult] = await Promise.all([
+    const [showRows, creatorRows, episodeResult] = await Promise.all([
       fetchAllSystemShows(),
+      fetchAllSystemCreators(),
       supabase.from("episodes").select("id", { count: "exact", head: true }),
     ]);
 
@@ -372,6 +398,8 @@ export default function CreatorProfile() {
 
     const episodeCount = Number(episodeResult.count || 0);
     setSystemStats({ shows: showRows.length, episodes: episodeCount });
+    setFollowing(creatorRows);
+    setFollowingCount(creatorRows.length);
 
     const items = showRows.map((show, index) => ({
       id: `system-${show.id}`,
@@ -392,7 +420,7 @@ export default function CreatorProfile() {
         subtitle: `${showRows.length.toLocaleString("en-GB")} shows • ${episodeCount.toLocaleString("en-GB")} episodes watched`,
         badge: "Auto",
         description:
-          "This system collection mirrors the BURGRS database automatically. Every show currently in the database is included, every episode is treated as watched, and future additions appear without manual maintenance.",
+          "This system collection mirrors the BURGRS database automatically. Every show currently in the database is included, every episode is treated as watched, every creator is followed, and future additions appear without manual maintenance.",
         visibility: "public",
         created_at: null,
         items,
@@ -997,6 +1025,14 @@ export default function CreatorProfile() {
         >
           <button
             type="button"
+            className={getStatButtonClass("following")}
+            onClick={() => setActiveProfilePanel("following")}
+          >
+            <strong>{followingCount.toLocaleString("en-GB")}</strong>
+            <span>Creators followed</span>
+          </button>
+          <button
+            type="button"
             className={getStatButtonClass("lists")}
             onClick={() => setActiveProfilePanel("lists")}
           >
@@ -1087,9 +1123,12 @@ export default function CreatorProfile() {
         {activeProfilePanel === "following" ? (
           <>
             <div className="creator-section-head">
-              <h2>Following</h2>
+              <h2>{isSystemProfile ? "Creators followed" : "Following"}</h2>
             </div>
-            <ProfileList profiles={following} emptyText="Not following anyone yet." />
+            <ProfileList
+              profiles={following}
+              emptyText={isSystemProfile ? "No creator profiles found." : "Not following anyone yet."}
+            />
           </>
         ) : null}
 
