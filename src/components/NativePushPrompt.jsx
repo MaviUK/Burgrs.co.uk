@@ -1,10 +1,44 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
+import { supabase } from '../lib/supabase'
 import './NativePushPrompt.css'
 
 const DISMISSED_KEY = 'burgrs_push_prompt_dismissed'
 const TOKEN_KEY = 'burgrs_push_device_token'
+
+async function saveDeviceToken(token) {
+  if (!token) return
+  window.localStorage.setItem(TOKEN_KEY, token)
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return
+
+  const { error } = await supabase.rpc('register_push_device', {
+    p_token: token,
+    p_platform: Capacitor.getPlatform(),
+  })
+
+  if (error) throw error
+  window.dispatchEvent(new CustomEvent('burgrs:push-token', { detail: token }))
+}
+
+function openNotificationTarget(notification) {
+  const data = notification?.data || {}
+  const target = data.url || data.path || data.deepLink || data.deeplink
+  if (!target) return
+
+  try {
+    const url = new URL(target, window.location.origin)
+    if (url.origin === window.location.origin) {
+      window.location.assign(`${url.pathname}${url.search}${url.hash}`)
+      return
+    }
+    window.location.assign(url.toString())
+  } catch (error) {
+    console.warn('Unable to open push notification target:', error)
+  }
+}
 
 export default function NativePushPrompt() {
   const [visible, setVisible] = useState(false)
@@ -13,22 +47,64 @@ export default function NativePushPrompt() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
-    if (window.localStorage.getItem(DISMISSED_KEY) === '1') return
 
     let cancelled = false
+    const listeners = []
 
-    async function checkPermission() {
+    async function setupPush() {
       try {
+        listeners.push(await PushNotifications.addListener('registration', async (token) => {
+          try {
+            await saveDeviceToken(token.value)
+            if (!cancelled) {
+              setMessage('Notifications are ready on this phone.')
+              setBusy(false)
+              window.setTimeout(() => setVisible(false), 900)
+            }
+          } catch (error) {
+            console.error('Failed saving push token:', error)
+            if (!cancelled) {
+              setMessage('This phone registered, but BURGRS could not save it. Please try again.')
+              setBusy(false)
+            }
+          }
+        }))
+
+        listeners.push(await PushNotifications.addListener('registrationError', (error) => {
+          console.error('Push registration failed:', error)
+          if (!cancelled) {
+            setMessage('This phone could not be registered. Please try again.')
+            setBusy(false)
+          }
+        }))
+
+        listeners.push(await PushNotifications.addListener('pushNotificationActionPerformed', (event) => {
+          openNotificationTarget(event.notification)
+        }))
+
         const status = await PushNotifications.checkPermissions()
-        if (!cancelled && status.receive !== 'granted') setVisible(true)
+        if (status.receive === 'granted') {
+          await PushNotifications.register()
+        } else if (window.localStorage.getItem(DISMISSED_KEY) !== '1' && !cancelled) {
+          setVisible(true)
+        }
       } catch (error) {
-        console.error('Unable to check notification permission:', error)
+        console.error('Unable to initialise push notifications:', error)
       }
     }
 
-    checkPermission()
+    setupPush()
+
+    const authSubscription = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) return
+      const token = window.localStorage.getItem(TOKEN_KEY)
+      if (token) saveDeviceToken(token).catch((error) => console.error('Failed refreshing push token:', error))
+    })
+
     return () => {
       cancelled = true
+      listeners.forEach((listener) => listener.remove())
+      authSubscription.data.subscription.unsubscribe()
     }
   }, [])
 
@@ -36,19 +112,6 @@ export default function NativePushPrompt() {
     if (busy) return
     setBusy(true)
     setMessage('')
-
-    const registrationListener = await PushNotifications.addListener('registration', (token) => {
-      window.localStorage.setItem(TOKEN_KEY, token.value)
-      window.dispatchEvent(new CustomEvent('burgrs:push-token', { detail: token.value }))
-      setMessage('Notifications are ready on this phone.')
-      window.setTimeout(() => setVisible(false), 900)
-    })
-
-    const errorListener = await PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration failed:', error)
-      setMessage('This phone could not be registered. Please try again.')
-      setBusy(false)
-    })
 
     try {
       let status = await PushNotifications.checkPermissions()
@@ -62,17 +125,13 @@ export default function NativePushPrompt() {
         return
       }
 
+      window.localStorage.removeItem(DISMISSED_KEY)
       await PushNotifications.register()
     } catch (error) {
       console.error('Unable to enable notifications:', error)
       setMessage('Notifications could not be enabled. Please try again.')
       setBusy(false)
     }
-
-    window.setTimeout(() => {
-      registrationListener.remove()
-      errorListener.remove()
-    }, 15000)
   }
 
   function dismissPrompt() {
