@@ -4,7 +4,7 @@ export default function BurgrsBanner() {
       <div className="burgrs-banner-overlay" />
       <div className="burgrs-banner-center">
         <img
-          src="/burgrs-header-logo.webp"
+          src="/burgrs-header-logo-v2.webp"
           alt="BURGRS TV"
           className="burgrs-banner-burger"
           style={{
