@@ -4,11 +4,18 @@ export default function BurgrsBanner() {
       <div className="burgrs-banner-overlay" />
       <div className="burgrs-banner-center">
         <img
-          src="/burger-rating.png"
-          alt="Burger"
+          src="/favicon-512.png"
+          alt="BURGRS"
           className="burgrs-banner-burger"
+          style={{
+            position: "relative",
+            width: "64px",
+            height: "auto",
+            maxHeight: "80%",
+            opacity: 1,
+            filter: "drop-shadow(0 4px 10px rgba(0, 0, 0, 0.28))",
+          }}
         />
-        <h1 className="burgrs-banner-title">BURGRS</h1>
       </div>
     </header>
   );
