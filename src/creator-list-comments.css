@@ -145,6 +145,31 @@
   white-space: nowrap;
 }
 
+.creator-list-comment-delete {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #c4b5fd;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.creator-list-comment-delete:hover,
+.creator-list-comment-delete:focus-visible {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.creator-list-comment-delete:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .creator-list-comment-username,
 .creator-list-comment-handle {
   flex: 0 0 auto;
