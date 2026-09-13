@@ -108,6 +108,20 @@ async function loadComments(listKey) {
   }));
 }
 
+function updateCommentCount(panel) {
+  const count = panel.querySelectorAll(".creator-list-comment-row").length;
+  const toggle = panel.previousElementSibling?.querySelector(".creator-list-comments-toggle");
+  if (toggle) toggle.textContent = count ? `${count} comment${count === 1 ? "" : "s"}` : "Comments";
+
+  const list = panel.querySelector(".creator-list-comment-list");
+  if (list && count === 0 && !list.querySelector(".creator-list-comment-muted")) {
+    const empty = document.createElement("p");
+    empty.className = "creator-list-comment-muted";
+    empty.textContent = "No comments yet.";
+    list.appendChild(empty);
+  }
+}
+
 function renderCommentRows(panel, comments) {
   const list = document.createElement("div");
   list.className = "creator-list-comment-list";
@@ -123,6 +137,11 @@ function renderCommentRows(panel, comments) {
       const displayName = getProfileDisplayName(profile, "User");
       const profileUrl = getProfileHref(profile, comment.user_id);
       const username = String(profile.username || "").trim();
+      const currentUserId = profileContext?.currentUserId || null;
+      const canDelete = Boolean(
+        currentUserId &&
+        (String(comment.user_id) === String(currentUserId) || String(profileContext?.profileId || "") === String(currentUserId))
+      );
 
       const row = document.createElement("article");
       row.className = "creator-list-comment-row";
@@ -175,6 +194,32 @@ function renderCommentRows(panel, comments) {
       userLine.appendChild(date);
 
       head.append(avatarLink, userLine);
+
+      if (canDelete) {
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "creator-list-comment-delete";
+        deleteButton.textContent = "Delete";
+        deleteButton.setAttribute("aria-label", "Delete this comment");
+        deleteButton.addEventListener("click", async () => {
+          if (!window.confirm("Delete this comment permanently?")) return;
+          deleteButton.disabled = true;
+          deleteButton.textContent = "Deleting...";
+          const { error } = await supabase.rpc("delete_owned_thread_item", {
+            p_table_name: "creator_list_comments",
+            p_item_id: comment.id,
+          });
+          if (error) {
+            console.error("Failed deleting creator-list comment", error);
+            deleteButton.disabled = false;
+            deleteButton.textContent = "Delete";
+            return;
+          }
+          row.remove();
+          updateCommentCount(panel);
+        });
+        head.appendChild(deleteButton);
+      }
 
       const body = document.createElement("p");
       body.className = "creator-list-comment-body";
