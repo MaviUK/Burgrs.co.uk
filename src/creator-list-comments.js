@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { getProfileDisplayName, getProfileHref } from "./lib/profileLinks";
 
 const AUTO_TITLE = "Top 10 shows of all time";
 const HIGHLIGHT_CLASS = "notification-target-highlight";
@@ -19,6 +20,19 @@ function getSlug() {
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 async function loadContext() {
@@ -70,7 +84,28 @@ async function loadComments(listKey) {
     .order("created_at", { ascending: true })
     .limit(50);
   if (error) throw error;
-  return data || [];
+
+  const comments = data || [];
+  const userIds = Array.from(new Set(comments.map((comment) => comment.user_id).filter(Boolean)));
+  let profileMap = new Map();
+
+  if (userIds.length) {
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, username, full_name, display_name, avatar_url")
+      .in("id", userIds);
+
+    if (profileError) {
+      console.warn("Failed loading creator-list comment profiles", profileError);
+    } else {
+      profileMap = new Map((profiles || []).map((profile) => [String(profile.id), profile]));
+    }
+  }
+
+  return comments.map((comment) => ({
+    ...comment,
+    profile: profileMap.get(String(comment.user_id)) || { id: comment.user_id },
+  }));
 }
 
 function renderCommentRows(panel, comments) {
@@ -84,17 +119,77 @@ function renderCommentRows(panel, comments) {
     list.appendChild(empty);
   } else {
     comments.forEach((comment) => {
-      const row = document.createElement("div");
+      const profile = comment.profile || { id: comment.user_id };
+      const displayName = getProfileDisplayName(profile, "User");
+      const profileUrl = getProfileHref(profile, comment.user_id);
+      const username = String(profile.username || "").trim();
+
+      const row = document.createElement("article");
       row.className = "creator-list-comment-row";
       row.dataset.commentId = String(comment.id || "");
+
+      const card = document.createElement("div");
+      card.className = "creator-list-comment-card";
+
+      const head = document.createElement("div");
+      head.className = "creator-list-comment-head";
+
+      const avatarLink = document.createElement("a");
+      avatarLink.className = "creator-list-comment-avatar-link";
+      avatarLink.href = profileUrl;
+      avatarLink.setAttribute("aria-label", `Open ${displayName}'s profile`);
+
+      if (profile.avatar_url) {
+        const avatar = document.createElement("img");
+        avatar.className = "creator-list-comment-avatar";
+        avatar.src = profile.avatar_url;
+        avatar.alt = "";
+        avatarLink.appendChild(avatar);
+      } else {
+        const fallback = document.createElement("div");
+        fallback.className = "creator-list-comment-avatar creator-list-comment-avatar-fallback";
+        fallback.textContent = displayName.slice(0, 1).toUpperCase() || "?";
+        avatarLink.appendChild(fallback);
+      }
+
+      const userLine = document.createElement("div");
+      userLine.className = "creator-list-comment-user-line";
+
+      const nameLink = document.createElement("a");
+      nameLink.className = "creator-list-comment-username";
+      nameLink.href = profileUrl;
+      nameLink.textContent = displayName;
+      userLine.appendChild(nameLink);
+
+      if (username && displayName !== username) {
+        const handleLink = document.createElement("a");
+        handleLink.className = "creator-list-comment-handle";
+        handleLink.href = profileUrl;
+        handleLink.textContent = `@${username}`;
+        userLine.appendChild(handleLink);
+      }
+
+      const date = document.createElement("span");
+      date.className = "creator-list-comment-date";
+      date.textContent = formatDateTime(comment.created_at);
+      userLine.appendChild(date);
+
+      head.append(avatarLink, userLine);
+
       const body = document.createElement("p");
+      body.className = "creator-list-comment-body";
       body.textContent = comment.body || "";
-      row.appendChild(body);
+
+      card.append(head, body);
+      row.appendChild(card);
       list.appendChild(row);
     });
   }
 
-  panel.appendChild(list);
+  const form = panel.querySelector(":scope > .creator-list-comment-form");
+  if (form) panel.insertBefore(list, form);
+  else panel.appendChild(list);
+  return list;
 }
 
 async function openPanel(card, actions, button, listKey, forceOpen = false) {
@@ -123,7 +218,7 @@ async function openPanel(card, actions, button, listKey, forceOpen = false) {
     const form = document.createElement("form");
     form.className = "creator-list-comment-form";
     const input = document.createElement("textarea");
-    input.rows = 2;
+    input.rows = 3;
     input.maxLength = 1000;
     input.placeholder = "Comment on this list...";
     const submit = document.createElement("button");
