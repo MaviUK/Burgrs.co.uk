@@ -71,6 +71,13 @@ function ReviewItem({
   const profileUrl = getProfileHref(profile, review.user_id);
   const ratingLabel = formatRating(review.user_rating);
   const isOwnReview = currentUserId && String(review.user_id) === String(currentUserId);
+  const canModerateReply = Boolean(
+    depth > 0 &&
+    currentUserId &&
+    rootOwnerId &&
+    String(rootOwnerId) === String(currentUserId) &&
+    !isOwnReview
+  );
   const blockedDirectly = blockedUserIds.has(String(review.user_id));
   const blockedRoot = rootOwnerId && blockedUserIds.has(String(rootOwnerId));
   const canReply = Boolean(currentUserId && !isOwnReview && !blockedDirectly && !blockedRoot);
@@ -157,6 +164,16 @@ function ReviewItem({
                 }}
               >
                 Edit
+              </button>
+            ) : canModerateReply ? (
+              <button
+                type="button"
+                className="msd-review-header-action"
+                onClick={deleteReview}
+                disabled={isDeleting}
+                aria-label="Delete reply to your review"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
               </button>
             ) : null}
           </div>
