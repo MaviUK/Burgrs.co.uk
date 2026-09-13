@@ -130,6 +130,41 @@ client.from = (table) => {
   });
 };
 
+let lastSystemAdminSyncUserId = "";
+
+async function syncSystemAdminDefaults(session) {
+  const userId = session?.user?.id || "";
+  if (!userId || userId === lastSystemAdminSyncUserId) return;
+
+  lastSystemAdminSyncUserId = userId;
+
+  try {
+    const { error } = await client.rpc("ensure_burgers_tv_defaults");
+    if (error) throw error;
+  } catch (error) {
+    lastSystemAdminSyncUserId = "";
+    console.warn("Failed syncing BURGRS system admin defaults:", error);
+  }
+}
+
+if (typeof window !== "undefined") {
+  client.auth
+    .getSession()
+    .then(({ data }) => syncSystemAdminDefaults(data?.session || null))
+    .catch((error) => {
+      console.warn("Failed loading session for BURGRS system admin sync:", error);
+    });
+
+  client.auth.onAuthStateChange((_event, session) => {
+    if (!session?.user?.id) {
+      lastSystemAdminSyncUserId = "";
+      return;
+    }
+
+    void syncSystemAdminDefaults(session);
+  });
+}
+
 installSmartShowLinks(client);
 
 export const supabase = client;
