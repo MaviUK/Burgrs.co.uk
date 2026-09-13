@@ -1,3 +1,7 @@
+import { installSystemAdminProfile } from "./system-admin-profile";
+
+installSystemAdminProfile();
+
 let scheduled = false;
 let lastScrolledKey = "";
 
