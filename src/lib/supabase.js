@@ -6,6 +6,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MY_SHOWS_CACHE_PREFIX = "trackt_my_shows_cache_v1";
 const DASHBOARD_CACHE_PREFIX = "trackt_dashboard_cache_v6_SAVED_SHOW_ID_LINKS";
+const MY_SHOWS_CACHE_SCHEMA_KEY = "burgrs_my_shows_cache_schema";
+const MY_SHOWS_CACHE_SCHEMA_VERSION = "2";
+const USER_SHOWS_PAGE_SIZE = 1000;
 
 function clearStoredShowCaches() {
   if (typeof window === "undefined") return;
@@ -28,6 +31,23 @@ function clearStoredShowCaches() {
     keysToRemove.forEach((key) => window.localStorage.removeItem(key));
   } catch (error) {
     console.warn("Failed clearing stored show caches:", error);
+  }
+}
+
+function ensureCurrentShowCacheSchema() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const currentVersion = window.localStorage.getItem(MY_SHOWS_CACHE_SCHEMA_KEY);
+    if (currentVersion === MY_SHOWS_CACHE_SCHEMA_VERSION) return;
+
+    clearStoredShowCaches();
+    window.localStorage.setItem(
+      MY_SHOWS_CACHE_SCHEMA_KEY,
+      MY_SHOWS_CACHE_SCHEMA_VERSION
+    );
+  } catch (error) {
+    console.warn("Failed upgrading stored show cache schema:", error);
   }
 }
 
@@ -56,11 +76,44 @@ function wrapUserShowsMutation(builder) {
   });
 }
 
-function wrapUserShowsRead(builder, selectedColumns = "") {
+async function fetchAllUserShowPages(builder) {
+  const allRows = [];
+  let from = 0;
+  let lastResponse = null;
+
+  while (true) {
+    const to = from + USER_SHOWS_PAGE_SIZE - 1;
+    const response = await builder.range(from, to);
+    lastResponse = response;
+
+    if (response?.error) return response;
+
+    const rows = Array.isArray(response?.data) ? response.data : [];
+    allRows.push(...rows);
+
+    if (rows.length < USER_SHOWS_PAGE_SIZE) break;
+    from += USER_SHOWS_PAGE_SIZE;
+  }
+
+  return {
+    ...(lastResponse || {}),
+    data: allRows,
+    error: null,
+  };
+}
+
+function wrapUserShowsRead(builder, selectedColumns = "", options = {}) {
   const includesWatchStatus = String(selectedColumns).includes("watch_status");
+  const shouldPaginateMyShows = String(selectedColumns).includes("shows!inner(*)");
+  const isSingleResult = Boolean(options.isSingleResult);
 
   return new Proxy(builder, {
     get(target, property) {
+      if (property === "then" && shouldPaginateMyShows && !isSingleResult) {
+        return (onFulfilled, onRejected) =>
+          fetchAllUserShowPages(target).then(onFulfilled, onRejected);
+      }
+
       const value = Reflect.get(target, property, target);
 
       if (property === "maybeSingle" && typeof value === "function") {
@@ -88,12 +141,19 @@ function wrapUserShowsRead(builder, selectedColumns = "") {
         };
       }
 
+      if (property === "single" && typeof value === "function") {
+        return (...args) =>
+          wrapUserShowsRead(value.apply(target, args), selectedColumns, {
+            isSingleResult: true,
+          });
+      }
+
       if (typeof value !== "function") return value;
 
       return (...args) => {
         const result = value.apply(target, args);
         return result && typeof result === "object"
-          ? wrapUserShowsRead(result, selectedColumns)
+          ? wrapUserShowsRead(result, selectedColumns, options)
           : result;
       };
     },
@@ -148,6 +208,8 @@ async function syncSystemAdminDefaults(session) {
 }
 
 if (typeof window !== "undefined") {
+  ensureCurrentShowCacheSchema();
+
   client.auth
     .getSession()
     .then(({ data }) => syncSystemAdminDefaults(data?.session || null))
