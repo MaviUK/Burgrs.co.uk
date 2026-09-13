@@ -81,6 +81,13 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(2, 6, 23, 0.28);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.creator-list-comment-row.notification-target-highlight {
+  border-color: rgba(239, 35, 60, 0.95);
+  background: rgba(239, 35, 60, 0.12);
+  box-shadow: 0 0 0 2px rgba(239, 35, 60, 0.2), 0 0 18px rgba(239, 35, 60, 0.35);
 }
 
 .creator-list-comment-row p,
