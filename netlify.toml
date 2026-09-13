@@ -45,3 +45,5 @@
   for = "/legal.css"
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=86400"
+
+# Deployment retry after correcting Netlify environment configuration.
