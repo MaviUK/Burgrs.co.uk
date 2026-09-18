@@ -978,8 +978,26 @@ const burgrTouchRef = useRef({
         return Number(a.number ?? 0) - Number(b.number ?? 0);
       });
 
+    if (!mainEpisodes.length) return null;
+
+    let lastWatchedIndex = -1;
+
+    mainEpisodes.forEach((ep, index) => {
+      if (isEpisodeWatched(ep, watchedLookup)) {
+        lastWatchedIndex = index;
+      }
+    });
+
+    if (lastWatchedIndex < 0) {
+      return (
+        mainEpisodes.find((ep) => !isEpisodeWatched(ep, watchedLookup)) || null
+      );
+    }
+
     return (
-      mainEpisodes.find((ep) => !isEpisodeWatched(ep, watchedLookup)) || null
+      mainEpisodes
+        .slice(lastWatchedIndex + 1)
+        .find((ep) => !isEpisodeWatched(ep, watchedLookup)) || null
     );
   }, [episodes, watchedLookup]);
 
