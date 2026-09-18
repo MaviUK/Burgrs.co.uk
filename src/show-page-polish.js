@@ -373,90 +373,48 @@ function createQuickSpotlight(route, context) {
   statsRow.insertAdjacentElement("afterend", card);
 }
 
-function createSeasonPicker(context) {
+function createSpecialsPanel(context) {
   const seasonsPanel = document.querySelector(".msd-tab-panel");
-  if (!seasonsPanel || document.querySelector(".burgr-season-picker")) return;
+  if (!seasonsPanel || document.querySelector(".burgr-specials-panel")) return;
 
-  const heading = Array.from(seasonsPanel.querySelectorAll(".msd-section-title")).find(
-    (item) => item.textContent?.trim().toLowerCase() === "seasons"
+  const specials = context.episodes.filter(
+    (episode) => Number(episode.seasonNumber) === 0
   );
-  if (!heading) return;
+  if (!specials.length) return;
 
-  const seasonCards = Array.from(seasonsPanel.querySelectorAll(".msd-season-card"));
-  const specials = context.episodes.filter((episode) => Number(episode.seasonNumber) === 0);
-  if (!seasonCards.length && !specials.length) return;
+  const seasonsContainer = seasonsPanel.querySelector(".msd-seasons");
+  if (!seasonsContainer) return;
 
-  const picker = document.createElement("div");
-  picker.className = "burgr-season-picker";
-  picker.setAttribute("aria-label", "Jump to season");
+  const panel = document.createElement("section");
+  panel.className = "msd-season-card burgr-specials-panel";
 
-  seasonCards.forEach((card) => {
-    const title = card.querySelector(".msd-season-title")?.textContent?.trim() || "Season";
-    const seasonMatch = title.match(/(\d+)/);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "burgr-season-chip";
-    button.textContent = title;
-    button.addEventListener("click", () => {
-      if (!card.querySelector(".msd-episode-list")) {
-        card.querySelector(".msd-season-toggle")?.click();
-      }
-      window.setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
-    });
-    if (seasonMatch) button.dataset.season = seasonMatch[1];
-    picker.appendChild(button);
+  const title = document.createElement("div");
+  title.className = "msd-season-title";
+  title.textContent = "Specials";
+  panel.appendChild(title);
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "msd-season-subtitle";
+  subtitle.textContent = `${specials.length} special${specials.length === 1 ? "" : "s"}`;
+  panel.appendChild(subtitle);
+
+  const list = document.createElement("div");
+  list.className = "burgr-specials-list";
+  specials.slice(0, 16).forEach((episode) => {
+    const row = document.createElement("div");
+    row.className = "burgr-special-row";
+    const name = document.createElement("strong");
+    name.textContent = `${episodeCode(episode)} · ${episode.name}`;
+    row.appendChild(name);
+    if (episode.aired) {
+      const date = document.createElement("span");
+      date.textContent = formatDate(episode.aired);
+      row.appendChild(date);
+    }
+    list.appendChild(row);
   });
-
-  if (specials.length) {
-    const specialButton = document.createElement("button");
-    specialButton.type = "button";
-    specialButton.className = "burgr-season-chip";
-    specialButton.textContent = `Specials (${specials.length})`;
-    specialButton.addEventListener("click", () => {
-      document
-        .querySelector(".burgr-specials-panel")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    picker.appendChild(specialButton);
-  }
-
-  heading.insertAdjacentElement("afterend", picker);
-
-  if (specials.length && !document.querySelector(".burgr-specials-panel")) {
-    const seasonsContainer = seasonsPanel.querySelector(".msd-seasons");
-    if (!seasonsContainer) return;
-
-    const panel = document.createElement("section");
-    panel.className = "msd-season-card burgr-specials-panel";
-
-    const title = document.createElement("div");
-    title.className = "msd-season-title";
-    title.textContent = "Specials";
-    panel.appendChild(title);
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "msd-season-subtitle";
-    subtitle.textContent = `${specials.length} special${specials.length === 1 ? "" : "s"}`;
-    panel.appendChild(subtitle);
-
-    const list = document.createElement("div");
-    list.className = "burgr-specials-list";
-    specials.slice(0, 16).forEach((episode) => {
-      const row = document.createElement("div");
-      row.className = "burgr-special-row";
-      const name = document.createElement("strong");
-      name.textContent = `${episodeCode(episode)} · ${episode.name}`;
-      row.appendChild(name);
-      if (episode.aired) {
-        const date = document.createElement("span");
-        date.textContent = formatDate(episode.aired);
-        row.appendChild(date);
-      }
-      list.appendChild(row);
-    });
-    panel.appendChild(list);
-    seasonsContainer.appendChild(panel);
-  }
+  panel.appendChild(list);
+  seasonsContainer.appendChild(panel);
 }
 
 function addSectionLabels() {
@@ -485,7 +443,7 @@ async function enhanceShowPage() {
     if (getShowRoute()?.key !== route.key) return;
 
     createQuickSpotlight(route, context);
-    createSeasonPicker(context);
+    createSpecialsPanel(context);
     addSectionLabels();
   } catch (error) {
     console.warn("Show page polish failed", error);
