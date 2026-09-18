@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v9_LEAN_DATA";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v10_NEXT_EPISODE";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 60 * 24;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -365,7 +365,21 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       const showEpisodes = episodesByShow.get(showKey) || [];
       const airedEpisodes = showEpisodes.filter((episode) => episode.aired && hasAired(episode.aired));
       const watchedCount = airedEpisodes.filter((episode) => watchedIds.has(String(episode.id))).length;
-      const nextEpisode = airedEpisodes.find((episode) => !watchedIds.has(String(episode.id)));
+
+      let lastWatchedIndex = -1;
+      airedEpisodes.forEach((episode, index) => {
+        if (watchedIds.has(String(episode.id))) {
+          lastWatchedIndex = index;
+        }
+      });
+
+      const nextEpisode =
+        lastWatchedIndex < 0
+          ? airedEpisodes.find((episode) => !watchedIds.has(String(episode.id))) || null
+          : airedEpisodes
+              .slice(lastWatchedIndex + 1)
+              .find((episode) => !watchedIds.has(String(episode.id))) || null;
+
       if (!nextEpisode) return null;
 
       return {
