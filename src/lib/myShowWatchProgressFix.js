@@ -275,7 +275,29 @@ function updateBottomWatchButton(episodes, watchedIds) {
   if (!actionBar) return;
 
   let existing = actionBar.querySelector(".msd-bottom-action-btn-primary");
-  const nextEpisode = episodes.find((ep) => !watchedIds.has(String(ep.id)));
+  const mainEpisodes = [...(episodes || [])]
+    .filter((ep) => Number(ep?.season_number ?? 0) > 0)
+    .sort((a, b) => {
+      const seasonDiff =
+        Number(a?.season_number ?? 0) - Number(b?.season_number ?? 0);
+      if (seasonDiff !== 0) return seasonDiff;
+      return Number(a?.episode_number ?? 0) - Number(b?.episode_number ?? 0);
+    });
+
+  let lastWatchedIndex = -1;
+
+  mainEpisodes.forEach((ep, index) => {
+    if (watchedIds.has(String(ep.id))) {
+      lastWatchedIndex = index;
+    }
+  });
+
+  const nextEpisode =
+    lastWatchedIndex < 0
+      ? mainEpisodes.find((ep) => !watchedIds.has(String(ep.id))) || null
+      : mainEpisodes
+          .slice(lastWatchedIndex + 1)
+          .find((ep) => !watchedIds.has(String(ep.id))) || null;
 
   if (!nextEpisode) {
     if (existing) existing.remove();
