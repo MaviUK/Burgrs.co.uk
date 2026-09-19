@@ -420,7 +420,7 @@ function RankCard({ show, onChoose, onTouchStart, onTouchEnd, disabledLabel = ""
     >
       <div className="rankd-poster-frame">
         {show.poster_url ? (
-          <img src={show.poster_url} alt={show.show_name} className="rankd-poster-image" />
+          <img key={`${show.show_id}:${show.poster_url}`} src={show.poster_url} alt={show.show_name} className="rankd-poster-image" />
         ) : (
           <div className="rankd-poster-placeholder">{show.show_name}</div>
         )}
@@ -1128,6 +1128,7 @@ export default function Rankd() {
           <div id="rankd-top" className="section-card rankd-battle-shell">
             <div className="rankd-battle-layout">
               <RankCard
+                key={`left:${currentPair[0].show_id}:${currentPair[0].poster_url || ""}`}
                 show={currentPair[0]}
                 onChoose={() => handleChoice(currentPair[0].show_id)}
                 onTouchStart={buildTouchStartHandler()}
@@ -1138,6 +1139,7 @@ export default function Rankd() {
               <div className="rankd-battle-vs">VS</div>
 
               <RankCard
+                key={`right:${currentPair[1].show_id}:${currentPair[1].poster_url || ""}`}
                 show={currentPair[1]}
                 onChoose={() => handleChoice(currentPair[1].show_id)}
                 onTouchStart={buildTouchStartHandler()}
