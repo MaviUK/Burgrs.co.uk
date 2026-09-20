@@ -7,6 +7,8 @@ import { getShowStatus } from "../lib/showStatus";
 const MY_SHOWS_CACHE_PREFIX = "trackt_my_shows_cache_v1";
 const MY_SHOWS_CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 hours
 const MY_SHOWS_LAST_CACHE_KEY = `${MY_SHOWS_CACHE_PREFIX}:last`;
+const EPISODE_SHOW_BATCH_SIZE = 25;
+const EPISODE_FETCH_CONCURRENCY = 4;
 
 function getMyShowsCacheKey(userId) {
   return `${MY_SHOWS_CACHE_PREFIX}:${userId}`;
@@ -129,46 +131,56 @@ function getPreferredShowName(showRow) {
   );
 }
 
+async function fetchEpisodeBatch(showIds) {
+  const allEpisodes = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const to = from + pageSize - 1;
+
+    const { data, error } = await supabase
+      .from("episodes")
+      .select(`
+        id,
+        show_id,
+        season_number,
+        episode_number,
+        name,
+        aired_date
+      `)
+      .in("show_id", showIds)
+      .order("show_id", { ascending: true })
+      .order("season_number", { ascending: true })
+      .order("episode_number", { ascending: true })
+      .range(from, to);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    allEpisodes.push(...rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allEpisodes;
+}
+
 async function fetchEpisodesForShowIds(showIds) {
   if (!showIds.length) return [];
 
-  const batches = chunkArray(showIds, 4);
+  const batches = chunkArray(showIds, EPISODE_SHOW_BATCH_SIZE);
   const allEpisodes = [];
-  const pageSize = 1000;
 
-  for (const batch of batches) {
-    let from = 0;
-    let done = false;
+  for (let i = 0; i < batches.length; i += EPISODE_FETCH_CONCURRENCY) {
+    const batchGroup = batches.slice(i, i + EPISODE_FETCH_CONCURRENCY);
+    const groupResults = await Promise.all(
+      batchGroup.map((batch) => fetchEpisodeBatch(batch))
+    );
 
-    while (!done) {
-      const to = from + pageSize - 1;
-
-      const { data, error } = await supabase
-        .from("episodes")
-        .select(`
-          id,
-          show_id,
-          season_number,
-          episode_number,
-          name,
-          aired_date
-        `)
-        .in("show_id", batch)
-        .order("show_id", { ascending: true })
-        .order("season_number", { ascending: true })
-        .order("episode_number", { ascending: true })
-        .range(from, to);
-
-      if (error) throw error;
-
-      const rows = data || [];
+    for (const rows of groupResults) {
       allEpisodes.push(...rows);
-
-      if (rows.length < pageSize) {
-        done = true;
-      } else {
-        from += pageSize;
-      }
     }
   }
 
@@ -372,14 +384,14 @@ export default function MyShows() {
   }, []);
 
   async function loadShows() {
-    let hasCachedShows = false;
+    let hasVisibleShows = false;
 
     try {
       setLoading(true);
 
       const instantCachedShows = readLastMyShowsCache();
       if (Array.isArray(instantCachedShows)) {
-        hasCachedShows = true;
+        hasVisibleShows = true;
         setShows(instantCachedShows);
         setLoading(false);
       }
@@ -399,9 +411,10 @@ export default function MyShows() {
       }
 
       const cachedShows = readMyShowsCache(user.id);
-      hasCachedShows = Array.isArray(cachedShows);
+      const hasCachedShows = Array.isArray(cachedShows);
 
       if (hasCachedShows) {
+        hasVisibleShows = true;
         setShows(cachedShows);
         setLoading(false);
         return;
@@ -438,6 +451,51 @@ export default function MyShows() {
         poster_url: row.shows.poster_url || null,
         first_aired: row.shows.first_aired || null,
       }));
+
+      const immediateShows = normalizedUserShows.map((show) => {
+        const statusValue = String(show.watch_status || "").toLowerCase();
+        const isArchived = statusValue === "archived";
+        const isCompleted = !isArchived && statusValue === "completed";
+        const isInProgress =
+          !isArchived &&
+          !isCompleted &&
+          (statusValue === "watching" ||
+            statusValue === "in_progress" ||
+            statusValue === "inprogress");
+        const isWatchlist =
+          !isArchived &&
+          !isCompleted &&
+          !isInProgress &&
+          statusValue === "watchlist";
+
+        return {
+          ...show,
+          nextEpisodeDate: null,
+          daysToNextEpisode: null,
+          watchedMainCount: 0,
+          totalMainEpisodes: 0,
+          status: null,
+          isArchived,
+          isWatchlist,
+          isCompleted,
+          isInProgress,
+          isAiring: false,
+          isAiringSoon: false,
+          resolvedWatchStatus: isArchived
+            ? "archived"
+            : isCompleted
+            ? "completed"
+            : isInProgress
+            ? "watching"
+            : "watchlist",
+        };
+      });
+
+      // Make the library usable as soon as the user's show rows are back.
+      // Episode/progress data is hydrated below without holding up the grid.
+      setShows(immediateShows);
+      setLoading(false);
+      hasVisibleShows = true;
 
       const showIds = normalizedUserShows
         .map((show) => show.show_id)
@@ -591,7 +649,7 @@ export default function MyShows() {
       }
     } catch (error) {
       console.error("LOAD SHOWS FAILED:", error);
-      if (!hasCachedShows) {
+      if (!hasVisibleShows) {
         setShows([]);
       }
     } finally {
