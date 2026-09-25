@@ -585,15 +585,10 @@ const burgrTouchRef = useRef({
     ) {
       try {
         const [
-          savedShowsResult,
           burgrRows,
           showWatchedRows,
           rankingRowResult,
         ] = await Promise.all([
-          supabase
-            .from("user_shows_new")
-            .select(`shows!inner(tvdb_id)`)
-            .eq("user_id", user.id),
           fetchBurgrRatings(showId),
           fetchWatchedRowsForEpisodeIds(episodeIds, user.id),
           supabase
@@ -606,8 +601,6 @@ const burgrTouchRef = useRef({
 
         if (isCancelled) return;
 
-        const savedShowsData = savedShowsResult?.data || [];
-
         if (rankingRowResult?.error) throw rankingRowResult.error;
 
         const ladderPosition = Number(rankingRowResult?.data?.ladder_position);
@@ -617,17 +610,10 @@ const burgrTouchRef = useRef({
             : null
         );
 
-        const savedTvdbIds = new Set(
-          savedShowsData
-            .map((row) => row?.shows?.tvdb_id)
-            .filter(Boolean)
-            .map(String)
-        );
-
         const myWatchedRows = showWatchedRows || [];
         const mine = (burgrRows || []).find((row) => row.user_id === user.id);
 
-        setSavedShowTvdbIds(savedTvdbIds);
+        setSavedShowTvdbIds(new Set());
         setWatchedRows(myWatchedRows);
         setCommunityWatchedRows(showWatchedRows || []);
         setWatchedLoaded(true);
@@ -642,26 +628,24 @@ const burgrTouchRef = useRef({
         try {
           setExtrasLoading(true);
 
-          const extras = await fetchShowExtrasCached({
-            source: tvdbId != null ? "tvdb" : "tmdb",
-            id: tvdbId != null ? tvdbId : tmdbIdValue,
-          });
-
-          let providers = null;
-
-          if (tmdbIdValue) {
-            try {
-              const providersRes = await fetch(
+          const providersPromise = tmdbIdValue
+            ? fetch(
                 `/.netlify/functions/getTmdbWatchProviders?tmdbId=${tmdbIdValue}&country=GB`
-              );
+              )
+                .then((response) => (response.ok ? response.json() : null))
+                .catch((providerError) => {
+                  console.error("Failed loading watch providers:", providerError);
+                  return null;
+                })
+            : Promise.resolve(null);
 
-              if (providersRes.ok) {
-                providers = await providersRes.json();
-              }
-            } catch (providerError) {
-              console.error("Failed loading watch providers:", providerError);
-            }
-          }
+          const [extras, providers] = await Promise.all([
+            fetchShowExtrasCached({
+              source: tvdbId != null ? "tvdb" : "tmdb",
+              id: tvdbId != null ? tvdbId : tmdbIdValue,
+            }),
+            providersPromise,
+          ]);
 
           const castRows = Array.isArray(extras.cast) ? extras.cast : [];
           const crewRows = Array.isArray(extras.crew) ? extras.crew : [];
@@ -709,12 +693,52 @@ const burgrTouchRef = useRef({
           }
 
           const filteredTmdbRecommendations = mappedTmdbRecommendations;
+          const candidateTvdbIds = Array.from(
+            new Set(
+              filteredTmdbRecommendations
+                .map(
+                  (rec) =>
+                    rec?.resolved_tvdb_id ??
+                    rec?.tvdb_id ??
+                    rec?.tvdbId ??
+                    null
+                )
+                .map(Number)
+                .filter((value) => Number.isFinite(value) && value > 0)
+            )
+          );
+
+          let savedRecommendationTvdbIds = new Set();
+
+          if (candidateTvdbIds.length) {
+            const { data: savedRecommendationRows, error: savedRecommendationError } =
+              await supabase
+                .from("user_shows_new")
+                .select("shows!inner(tvdb_id)")
+                .eq("user_id", user.id)
+                .in("shows.tvdb_id", candidateTvdbIds);
+
+            if (savedRecommendationError) {
+              console.warn(
+                "Failed checking saved recommendations:",
+                savedRecommendationError
+              );
+            } else {
+              savedRecommendationTvdbIds = new Set(
+                (savedRecommendationRows || [])
+                  .map((row) => row?.shows?.tvdb_id)
+                  .filter(Boolean)
+                  .map(String)
+              );
+            }
+          }
 
           if (!isCancelled) {
             setCast(castRows);
             setCrew(crewRows);
             setPeopleAlsoWatch([]);
             setRecommendedShows(filteredTmdbRecommendations);
+            setSavedShowTvdbIds(savedRecommendationTvdbIds);
             setMobileBannerUrl(storedBackdropUrl || bannerFromExtras || null);
             setWatchProviders(providers);
           }
