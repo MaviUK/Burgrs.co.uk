@@ -117,28 +117,19 @@ async function createRankdShareUrl() {
 
   const shareSlug = existing?.share_slug || makeShareSlug(leftTitle, rightTitle);
 
-  if (existing?.id) {
-    const { error: updateError } = await supabase
-      .from("rankd_matchups")
-      .update({ share_slug: shareSlug, is_shareable: true })
-      .eq("id", existing.id);
+  const { data: sharedMatchup, error: shareError } = await supabase.rpc(
+    "set_rankd_matchup_share",
+    {
+      p_show_a_id: showAId,
+      p_show_b_id: showBId,
+      p_share_slug: shareSlug,
+    }
+  );
 
-    if (updateError) throw updateError;
-  } else {
-    const { error: insertError } = await supabase.from("rankd_matchups").insert({
-      show_a_id: showAId,
-      show_b_id: showBId,
-      show_a_wins: 0,
-      show_b_wins: 0,
-      times_matched: 0,
-      share_slug: shareSlug,
-      is_shareable: true,
-    });
+  if (shareError) throw shareError;
 
-    if (insertError) throw insertError;
-  }
-
-  return `${window.location.origin}/rankd/share/${shareSlug}`;
+  const finalShareSlug = sharedMatchup?.share_slug || shareSlug;
+  return `${window.location.origin}/rankd/share/${finalShareSlug}`;
 }
 
 function openExternalShare(url) {
