@@ -11,7 +11,10 @@ function jsonResponse(statusCode, body) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "no-store",
+      "Cache-Control":
+        statusCode === 200
+          ? "public, max-age=300, stale-while-revalidate=1800"
+          : "no-store",
     },
     body: JSON.stringify(body),
   };
@@ -954,19 +957,25 @@ export async function handler(event) {
       seriesData?.firstAired || seriesData?.first_aired || ""
     );
 
-    const tmdbRecommendations = await getTmdbRecommendations(tmdbId);
+    const [
+      tmdbRecommendations,
+      fetchedEpisodes,
+      fetchedPeopleAlsoWatch,
+    ] = await Promise.all([
+      getTmdbRecommendations(tmdbId),
+      getSeriesEpisodesDefault(tvdbId),
+      getPeopleAlsoWatch(tvdbId),
+    ]);
 
     const show = normalizeShow(seriesData, tvdbId, tmdbBackdropUrl);
 
     const inlineEpisodes = normalizeEpisodes(seriesData, tvdbId);
-    const fetchedEpisodes = await getSeriesEpisodesDefault(tvdbId);
     const episodes =
       fetchedEpisodes.length > 0 ? fetchedEpisodes : inlineEpisodes;
 
     const cast = normalizeCastFromSeries(seriesData);
 
     const inlinePeopleAlsoWatch = normalizePeopleAlsoWatch(seriesData);
-    const fetchedPeopleAlsoWatch = await getPeopleAlsoWatch(tvdbId);
     const peopleAlsoWatch =
       fetchedPeopleAlsoWatch.length > 0
         ? fetchedPeopleAlsoWatch
