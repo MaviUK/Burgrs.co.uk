@@ -342,6 +342,10 @@ report.completed_at = new Date().toISOString();
 await fs.mkdir("public", { recursive: true });
 await fs.writeFile("public/nyt-top100-sync-report.json", JSON.stringify(report, null, 2));
 
+if (report.missing_after.length) {
+  throw new Error(`NYT Top 100 verification failed: ${report.missing_after.join(", ")}`);
+}
+
 console.log(
   `NYT Top 100 sync complete: ${report.verified_count}/${report.total_requested} verified, ${report.inserted_count} inserted, ${report.error_count} errors.`
 );
