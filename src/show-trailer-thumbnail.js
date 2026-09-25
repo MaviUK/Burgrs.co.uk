@@ -102,9 +102,8 @@ function scheduleEnhancement() {
   });
 }
 
-const observer = new MutationObserver(scheduleEnhancement);
-observer.observe(document.documentElement, { childList: true, subtree: true });
 window.addEventListener("pageshow", scheduleEnhancement);
 window.addEventListener("popstate", scheduleEnhancement);
+document.addEventListener("burgrs:show-page-ready", scheduleEnhancement);
 
 scheduleEnhancement();
