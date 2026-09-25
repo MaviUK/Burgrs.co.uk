@@ -1,3 +1,5 @@
+import { fetchShowExtrasCached } from "./lib/showExtrasCache";
+
 let scheduled = false;
 const trailerCache = new Map();
 
@@ -33,12 +35,11 @@ async function getTrailerUrl(route) {
 
   const promise = (async () => {
     try {
-      const endpoint = route.source === "tmdb"
-        ? `/.netlify/functions/getTmdbShowDetails?tmdbId=${encodeURIComponent(route.id)}`
-        : `/.netlify/functions/getShowExtras?tvdbId=${encodeURIComponent(route.id)}`;
-      const response = await fetch(endpoint);
-      if (!response.ok) return "";
-      return readTrailerUrl(await response.json());
+      const extras = await fetchShowExtrasCached({
+        source: route.source,
+        id: route.id,
+      });
+      return readTrailerUrl(extras);
     } catch (error) {
       console.warn("Trailer lookup failed", error);
       return "";
