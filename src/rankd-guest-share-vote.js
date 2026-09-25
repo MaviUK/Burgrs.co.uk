@@ -1,6 +1,7 @@
 import { supabase } from "./lib/supabase";
 
 const PENDING_KEY = "burgrs_pending_rankd_signup_shows";
+const GUEST_TOKEN_KEY = "burgrs_rankd_guest_token";
 const VOTED_KEY_PREFIX = "burgrs_rankd_guest_voted:";
 let cachedSharedMatchup = null;
 let voteInFlight = false;
@@ -17,6 +18,29 @@ function getSharedSlug() {
 
 function getGuestVoteKey() {
   return `${VOTED_KEY_PREFIX}${getSharedSlug()}`;
+}
+
+function createGuestToken() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+function getOrCreateGuestToken() {
+  try {
+    const existing = window.localStorage.getItem(GUEST_TOKEN_KEY);
+    if (existing) return existing;
+
+    const token = createGuestToken();
+    window.localStorage.setItem(GUEST_TOKEN_KEY, token);
+    return token;
+  } catch {
+    return createGuestToken();
+  }
 }
 
 function hasAlreadyGuestVoted() {
@@ -274,14 +298,21 @@ async function handleGuestSharedVote(event) {
         return acc;
       }, {});
 
-    const { error } = await supabase.rpc("rankd_record_matchup_vote", {
-      p_show_a_id: showAId,
-      p_show_b_id: showBId,
-      p_winner_show_id: String(winner.id),
-      p_loser_show_id: String(loser.id),
-    });
+    const guestToken = getOrCreateGuestToken();
+    const { data: voteResult, error } = await supabase.rpc(
+      "rankd_record_guest_matchup_vote",
+      {
+        p_share_slug: matchup.share_slug,
+        p_guest_token: guestToken,
+        p_winner_show_id: String(winner.id),
+        p_loser_show_id: String(loser.id),
+      }
+    );
 
     if (error) throw error;
+    if (!voteResult?.recorded && !voteResult?.duplicate) {
+      throw new Error("Guest vote was not recorded.");
+    }
     window.dispatchEvent(new CustomEvent("rankd:guest-vote-recorded"));
   } catch (error) {
     console.warn("Guest shared Rankd vote failed:", error);
