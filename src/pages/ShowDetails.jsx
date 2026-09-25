@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { fetchShowExtrasCached } from "../lib/showExtrasCache";
+import {
+  fetchSeasonEpisodeDetailsCached,
+  fetchShowCoreCached,
+} from "../lib/showCoreCache";
 import { formatDate } from "../lib/date";
 import { addShowToUserList } from "../lib/userShows";
 import "./MyShowDetails.css";
@@ -370,10 +374,11 @@ export default function ShowDetails() {
 
       try {
         const {
-          data: { user },
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
+        const user = session?.user || null;
 
-        setViewer(user || null);
+        setViewer(user);
 
         const routeId = String(id || "");
         const numericTvdbId = Number(id);
@@ -413,45 +418,51 @@ export default function ShowDetails() {
         let dbEpisodes = [];
         let extras = null;
 
-        async function attachDatabaseShow(showData, fallbackId) {
+        async function attachDatabaseShow(
+          showData,
+          fallbackId,
+          prefetchedEpisodeRows = null
+        ) {
           if (!showData) return;
           dbShow = showData;
 
-          if (user) {
-            const { data: userShowData, error: userShowError } = await supabase
-              .from("user_shows_new")
-              .select("id")
-              .eq("user_id", user.id)
-              .eq("show_id", showData.id)
-              .maybeSingle();
+          const userShowPromise = user
+            ? supabase
+                .from("user_shows_new")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("show_id", showData.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null });
 
-            if (userShowError) {
-              console.warn("user show fetch failed", userShowError);
-            }
+          const episodePromise = Array.isArray(prefetchedEpisodeRows)
+            ? Promise.resolve({ data: prefetchedEpisodeRows, error: null })
+            : supabase
+                .from("episodes")
+                .select(`
+                  id,
+                  tvdb_id,
+                  show_id,
+                  season_number,
+                  episode_number,
+                  episode_code,
+                  name,
+                  aired_date
+                `)
+                .eq("show_id", showData.id)
+                .order("season_number", { ascending: true })
+                .order("episode_number", { ascending: true });
 
-            setIsAdded(!!userShowData);
-          } else {
-            setIsAdded(false);
+          const [
+            { data: userShowData, error: userShowError },
+            { data: episodeRows, error: episodeError },
+          ] = await Promise.all([userShowPromise, episodePromise]);
+
+          if (userShowError) {
+            console.warn("user show fetch failed", userShowError);
           }
 
-          const { data: episodeRows, error: episodeError } = await supabase
-            .from("episodes")
-            .select(`
-              id,
-              tvdb_id,
-              show_id,
-              season_number,
-              episode_number,
-              episode_code,
-              name,
-              overview,
-              aired_date,
-              image_url,
-              tmdb_still_path
-            `)
-            .eq("show_id", showData.id)
-            .order("season_number", { ascending: true })
-            .order("episode_number", { ascending: true });
+          setIsAdded(!!userShowData);
 
           if (episodeError) throw episodeError;
 
@@ -504,15 +515,15 @@ export default function ShowDetails() {
         if (!isTmdbFallback) {
           let showData = null;
 
-          if (hasNumericTvdbId) {
-            const { data, error: showError } = await supabase
-              .from("shows")
-              .select(`*`)
-              .eq("tvdb_id", numericTvdbId)
-              .maybeSingle();
+          let prefetchedEpisodeRows = null;
 
-            if (showError) throw showError;
-            showData = data || null;
+          if (hasNumericTvdbId) {
+            const core = await fetchShowCoreCached({
+              source: "tvdb",
+              id: numericTvdbId,
+            });
+            showData = core.show || null;
+            prefetchedEpisodeRows = core.episodes || [];
           }
 
           if (!showData && isUuid(routeId)) {
@@ -527,7 +538,11 @@ export default function ShowDetails() {
           }
 
           if (showData) {
-            await attachDatabaseShow(showData, showData.tvdb_id || numericTvdbId || showData.tmdb_id);
+            await attachDatabaseShow(
+              showData,
+              showData.tvdb_id || numericTvdbId || showData.tmdb_id,
+              prefetchedEpisodeRows
+            );
             renderDatabaseShowImmediately(
               showData,
               showData.tvdb_id || numericTvdbId || showData.tmdb_id
@@ -553,16 +568,18 @@ export default function ShowDetails() {
             }
           }
         } else {
-          const { data: showData, error: showError } = await supabase
-            .from("shows")
-            .select(`*`)
-            .eq("tmdb_id", numericTmdbId)
-            .maybeSingle();
-
-          if (showError) throw showError;
+          const core = await fetchShowCoreCached({
+            source: "tmdb",
+            id: numericTmdbId,
+          });
+          const showData = core.show || null;
 
           if (showData) {
-            await attachDatabaseShow(showData, showData.tvdb_id || numericTmdbId);
+            await attachDatabaseShow(
+              showData,
+              showData.tvdb_id || numericTmdbId,
+              core.episodes || []
+            );
             renderDatabaseShowImmediately(
               showData,
               showData.tvdb_id || numericTmdbId
@@ -761,11 +778,48 @@ export default function ShowDetails() {
     sourceRating
   )}&sourceLanguage=${encodeURIComponent(sourceLanguage)}`;
 
+  async function hydrateSeasonEpisodeDetails(seasonNumber) {
+    if (!show?.id) return;
+
+    try {
+      const rows = await fetchSeasonEpisodeDetailsCached(
+        show.id,
+        seasonNumber
+      );
+
+      const detailsById = new Map(
+        rows.map((row, index) => [
+          String(row.id),
+          normalizeEpisodePayload(
+            row,
+            index,
+            show.tvdb_id || show.tmdb_id || show.id
+          ),
+        ])
+      );
+
+      setEpisodes((current) =>
+        current.map((episode) => {
+          const details = detailsById.get(String(episode.id));
+          return details ? { ...episode, ...details } : episode;
+        })
+      );
+    } catch (error) {
+      console.warn("Season episode details unavailable", error);
+    }
+  }
+
   function toggleSeason(seasonNumber) {
+    const willOpen = !expandedSeasons[seasonNumber];
+
     setExpandedSeasons((prev) => ({
       ...prev,
       [seasonNumber]: !prev[seasonNumber],
     }));
+
+    if (willOpen) {
+      void hydrateSeasonEpisodeDetails(seasonNumber);
+    }
   }
 
   async function handleAddShow() {
