@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { fetchShowExtrasCached } from "../lib/showExtrasCache";
 import { formatDate } from "../lib/date";
 import { addShowToUserList } from "../lib/userShows";
 import "./MyShowDetails.css";
@@ -463,6 +464,43 @@ export default function ShowDetails() {
           );
         }
 
+        function renderDatabaseShowImmediately(showData, fallbackId) {
+          if (!showData) return;
+
+          const normalizedShow = normalizeShowPayload(
+            showData,
+            showData.tvdb_id || fallbackId || null,
+            null
+          );
+
+          if (!normalizedShow) return;
+
+          const seasonMap = {};
+          dbEpisodes.forEach((ep) => {
+            const seasonKey = Number(ep.seasonNumber ?? 0);
+            if (seasonKey === 0) return;
+            if (!(seasonKey in seasonMap)) seasonMap[seasonKey] = false;
+          });
+
+          setShow({
+            ...normalizedShow,
+            trailer: null,
+            is_tmdb_fallback: false,
+          });
+          setEpisodes(dbEpisodes);
+          setExpandedSeasons(seasonMap);
+          setCast([]);
+          setCrew([]);
+          setRecommendedShows([]);
+          setMobileBannerUrl(normalizedShow.backdrop_url || null);
+          setExpandedOverview(false);
+          setActiveTab("seasons");
+
+          // The core show already exists locally, so don't make the first
+          // render wait for slower TVDB/TMDB enrichment.
+          setLoading(false);
+        }
+
         if (!isTmdbFallback) {
           let showData = null;
 
@@ -490,6 +528,10 @@ export default function ShowDetails() {
 
           if (showData) {
             await attachDatabaseShow(showData, showData.tvdb_id || numericTvdbId || showData.tmdb_id);
+            renderDatabaseShowImmediately(
+              showData,
+              showData.tvdb_id || numericTvdbId || showData.tmdb_id
+            );
           } else {
             setIsAdded(false);
           }
@@ -500,15 +542,10 @@ export default function ShowDetails() {
             try {
               setExtrasLoading(true);
 
-              const extrasRes = await fetch(
-                `/.netlify/functions/getShowExtras?tvdbId=${extrasTvdbId}`
-              );
-
-              if (extrasRes.ok) {
-                extras = await extrasRes.json();
-              } else {
-                console.warn(`getShowExtras returned ${extrasRes.status}`);
-              }
+              extras = await fetchShowExtrasCached({
+                source: "tvdb",
+                id: extrasTvdbId,
+              });
             } catch (extrasError) {
               console.error("Failed loading TVDB extras:", extrasError);
             } finally {
@@ -526,6 +563,10 @@ export default function ShowDetails() {
 
           if (showData) {
             await attachDatabaseShow(showData, showData.tvdb_id || numericTmdbId);
+            renderDatabaseShowImmediately(
+              showData,
+              showData.tvdb_id || numericTmdbId
+            );
           } else {
             setIsAdded(false);
           }
@@ -533,16 +574,11 @@ export default function ShowDetails() {
           try {
             setExtrasLoading(true);
 
-            const extrasRes = await fetch(
-              `/.netlify/functions/getTmdbShowDetails?tmdbId=${numericTmdbId}`
-            );
-
-            if (extrasRes.ok) {
-              const tmdbData = await extrasRes.json();
-              extras = normalizeTmdbExtras(tmdbData);
-            } else {
-              console.warn(`getTmdbShowDetails returned ${extrasRes.status}`);
-            }
+            const tmdbData = await fetchShowExtrasCached({
+              source: "tmdb",
+              id: numericTmdbId,
+            });
+            extras = normalizeTmdbExtras(tmdbData);
           } catch (extrasError) {
             console.error("Failed loading TMDB extras:", extrasError);
           } finally {
