@@ -3,6 +3,7 @@ import { fetchShowExtrasCached } from "./lib/showExtrasCache";
 import { fetchShowCoreCached } from "./lib/showCoreCache";
 
 const routeCache = new Map();
+const watchedIdsByRoute = new Map();
 let scheduled = false;
 let activeRouteKey = "";
 
@@ -145,9 +146,11 @@ async function loadDatabaseContext(route) {
     if (!showRow?.id) return { episodes: [], watchedIds: new Set() };
 
     const episodes = (core.episodes || []).map(normalizeEpisode);
-    const watchedIds = new Set();
+    const watchedIds = watchedIdsByRoute.has(route.key)
+      ? new Set(watchedIdsByRoute.get(route.key))
+      : new Set();
 
-    if (route.saved && episodes.length) {
+    if (route.saved && episodes.length && !watchedIdsByRoute.has(route.key)) {
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -447,10 +450,35 @@ function scheduleEnhancement() {
   });
 }
 
-const observer = new MutationObserver(scheduleEnhancement);
-observer.observe(document.documentElement, { childList: true, subtree: true });
+function handleShowPageReady(event) {
+  const route = getShowRoute();
+  if (!route) return;
+
+  const watchedIds = Array.isArray(event?.detail?.watchedIds)
+    ? event.detail.watchedIds.map(String)
+    : null;
+
+  if (route.saved && watchedIds) {
+    const previous = watchedIdsByRoute.get(route.key) || new Set();
+    const next = new Set(watchedIds);
+    const changed =
+      previous.size !== next.size ||
+      [...next].some((id) => !previous.has(id));
+
+    watchedIdsByRoute.set(route.key, next);
+
+    if (changed) {
+      routeCache.delete(route.key);
+      document.querySelector(".burgr-show-spotlight")?.remove();
+    }
+  }
+
+  scheduleEnhancement();
+}
+
 window.addEventListener("pageshow", scheduleEnhancement);
 window.addEventListener("popstate", scheduleEnhancement);
 document.addEventListener("burgrs:streaming-region", scheduleEnhancement);
+document.addEventListener("burgrs:show-page-ready", handleShowPageReady);
 
 scheduleEnhancement();
