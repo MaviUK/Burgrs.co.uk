@@ -872,6 +872,9 @@ const burgrTouchRef = useRef({
             showId: show.id,
             watchedLoaded,
             extrasLoading,
+            watchedIds: (watchedRows || [])
+              .map((row) => row?.episode_id)
+              .filter(Boolean),
           },
         })
       );
