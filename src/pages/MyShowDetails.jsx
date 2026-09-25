@@ -7,6 +7,10 @@ import {
 } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { fetchShowExtrasCached } from "../lib/showExtrasCache";
+import {
+  fetchSeasonEpisodeDetailsCached,
+  fetchShowCoreCached,
+} from "../lib/showCoreCache";
 import ShowReviews from "../components/ShowReviews";
 import EpisodeReviews from "../components/EpisodeReviews";
 import ShowChatBoard from "../components/ShowChatBoard";
@@ -330,8 +334,9 @@ const burgrTouchRef = useRef({
 
     async function loadCoreShow() {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user || null;
 
       if (!user) {
         if (!isCancelled) {
@@ -399,35 +404,11 @@ const burgrTouchRef = useRef({
         };
       }
 
-      let showQuery = supabase
-        .from("shows")
-        .select(`
-          id,
-          tvdb_id,
-          tmdb_id,
-          name,
-          overview,
-          status,
-          poster_url,
-          backdrop_url,
-          first_aired,
-          network,
-          genres,
-          original_language,
-          relationship_types,
-          settings,
-          rating_average,
-          rating_count
-        `)
-        .limit(1);
-
-      showQuery = isTmdbRoute
-        ? showQuery.eq("tmdb_id", numericRouteId)
-        : showQuery.eq("tvdb_id", numericRouteId);
-
-      const { data: showData, error: showError } = await showQuery.maybeSingle();
-
-      if (showError) throw showError;
+      const core = await fetchShowCoreCached({
+        source: isTmdbRoute ? "tmdb" : "tvdb",
+        id: numericRouteId,
+      });
+      const showData = core.show || null;
 
       if (!showData) {
         if (!isCancelled) {
@@ -471,30 +452,9 @@ const burgrTouchRef = useRef({
 
       if (userShowError) throw userShowError;
 
-      const { data: episodeRows, error: episodeError } = await supabase
-        .from("episodes")
-        .select(`
-          id,
-          tvdb_id,
-          show_id,
-          season_number,
-          episode_number,
-          episode_code,
-          name,
-          overview,
-          aired_date,
-          image_url,
-          tmdb_vote_average,
-          tmdb_vote_count,
-          tmdb_still_path
-        `)
-        .eq("show_id", showId)
-        .order("season_number", { ascending: true })
-        .order("episode_number", { ascending: true });
+      const episodeRows = core.episodes || [];
 
-      if (episodeError) throw episodeError;
-
-      const normalizedEpisodes = (episodeRows || []).map((row) => ({
+      const normalizedEpisodes = episodeRows.map((row) => ({
         id: row.id,
         tvdb_episode_id: row.tvdb_id,
         seasonNumber: row.season_number,
@@ -502,19 +462,11 @@ const burgrTouchRef = useRef({
         aired: row.aired_date,
         airDate: row.aired_date,
         name: row.name || "Untitled episode",
-        overview: row.overview || "",
-        image: row.image_url || row.tmdb_still_path || null,
+        overview: "",
+        image: null,
         episode_code: row.episode_code,
-        tmdbRating:
-          row.tmdb_vote_average != null &&
-          !Number.isNaN(Number(row.tmdb_vote_average))
-            ? Number(row.tmdb_vote_average)
-            : null,
-        tmdbVoteCount:
-          row.tmdb_vote_count != null &&
-          !Number.isNaN(Number(row.tmdb_vote_count))
-            ? Number(row.tmdb_vote_count)
-            : 0,
+        tmdbRating: null,
+        tmdbVoteCount: 0,
       }));
 
       const seasonMap = {};
@@ -524,12 +476,15 @@ const burgrTouchRef = useRef({
         if (!(seasonKey in seasonMap)) seasonMap[seasonKey] = false;
       });
 
+      let targetEpisodeSeason = null;
+
       if (targetEpisodeId) {
         const targetEpisode = normalizedEpisodes.find(
           (ep) => String(ep.id) === String(targetEpisodeId)
         );
         if (targetEpisode) {
-          seasonMap[Number(targetEpisode.seasonNumber ?? 0)] = true;
+          targetEpisodeSeason = Number(targetEpisode.seasonNumber ?? 0);
+          seasonMap[targetEpisodeSeason] = true;
         }
       }
 
@@ -572,6 +527,40 @@ const burgrTouchRef = useRef({
         setActiveTab("seasons");
         setWatchProviders(null);
         setWatchOptionsOpen(false);
+      }
+
+      if (targetEpisodeSeason != null) {
+        void fetchSeasonEpisodeDetailsCached(showId, targetEpisodeSeason)
+          .then((rows) => {
+            if (isCancelled) return;
+
+            const detailsById = new Map(rows.map((row) => [String(row.id), row]));
+            setEpisodes((current) =>
+              current.map((episode) => {
+                const row = detailsById.get(String(episode.id));
+                if (!row) return episode;
+
+                return {
+                  ...episode,
+                  overview: row.overview || "",
+                  image: row.image_url || row.tmdb_still_path || null,
+                  tmdbRating:
+                    row.tmdb_vote_average != null &&
+                    !Number.isNaN(Number(row.tmdb_vote_average))
+                      ? Number(row.tmdb_vote_average)
+                      : null,
+                  tmdbVoteCount:
+                    row.tmdb_vote_count != null &&
+                    !Number.isNaN(Number(row.tmdb_vote_count))
+                      ? Number(row.tmdb_vote_count)
+                      : 0,
+                };
+              })
+            );
+          })
+          .catch((error) => {
+            console.warn("Target episode season details unavailable", error);
+          });
       }
 
       return {
@@ -1065,11 +1054,55 @@ const burgrTouchRef = useRef({
   const isRemoved = show?.watch_status === "not_added";
   const isArchived = show?.watch_status === "archived";
 
+  async function hydrateSeasonEpisodeDetails(seasonNumber) {
+    if (!show?.id) return;
+
+    try {
+      const rows = await fetchSeasonEpisodeDetailsCached(
+        show.id,
+        seasonNumber
+      );
+      const detailsById = new Map(rows.map((row) => [String(row.id), row]));
+
+      setEpisodes((current) =>
+        current.map((episode) => {
+          const row = detailsById.get(String(episode.id));
+          if (!row) return episode;
+
+          return {
+            ...episode,
+            overview: row.overview || "",
+            image: row.image_url || row.tmdb_still_path || null,
+            episode_code: row.episode_code || episode.episode_code,
+            tmdbRating:
+              row.tmdb_vote_average != null &&
+              !Number.isNaN(Number(row.tmdb_vote_average))
+                ? Number(row.tmdb_vote_average)
+                : null,
+            tmdbVoteCount:
+              row.tmdb_vote_count != null &&
+              !Number.isNaN(Number(row.tmdb_vote_count))
+                ? Number(row.tmdb_vote_count)
+                : 0,
+          };
+        })
+      );
+    } catch (error) {
+      console.warn("Season episode details unavailable", error);
+    }
+  }
+
   function toggleSeason(seasonNumber) {
+    const willOpen = !expandedSeasons[seasonNumber];
+
     setExpandedSeasons((prev) => ({
       ...prev,
       [seasonNumber]: !prev[seasonNumber],
     }));
+
+    if (willOpen) {
+      void hydrateSeasonEpisodeDetails(seasonNumber);
+    }
   }
 
   async function refreshBurgrRatings(showId, userId) {
