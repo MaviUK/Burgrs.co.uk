@@ -862,7 +862,7 @@ const burgrTouchRef = useRef({
   }, [routeId, targetEpisodeId, isTmdbRoute]);
 
   useEffect(() => {
-    if (!show) return undefined;
+    if (!show || !watchedLoaded) return undefined;
 
     const frame = window.requestAnimationFrame(() => {
       document.dispatchEvent(
