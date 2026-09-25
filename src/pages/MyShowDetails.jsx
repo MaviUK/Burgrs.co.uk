@@ -292,6 +292,7 @@ const burgrTouchRef = useRef({
   const [expandedEpisodeOverviewIds, setExpandedEpisodeOverviewIds] = useState(
     {}
   );
+  const loadedEpisodeRatingSeasonsRef = useRef(new Set());
 
   const watchedLookup = useMemo(
     () => createWatchedLookup(watchedRows, show?.watch_status === "completed"),
@@ -587,8 +588,7 @@ const burgrTouchRef = useRef({
           savedShowsResult,
           burgrRows,
           showWatchedRows,
-          episodeRatingRows,
-          rankingRowsResult,
+          rankingRowResult,
         ] = await Promise.all([
           supabase
             .from("user_shows_new")
@@ -596,42 +596,26 @@ const burgrTouchRef = useRef({
             .eq("user_id", user.id),
           fetchBurgrRatings(showId),
           fetchWatchedRowsForEpisodeIds(episodeIds, user.id),
-          fetchAllEpisodeRatingsForShowEpisodeIds(episodeIds),
           supabase
             .from("user_show_rankings")
-            .select(`
-              show_id,
-              rating,
-              wins,
-              losses,
-              comparisons,
-              shows!inner(name)
-            `)
-            .eq("user_id", user.id),
+            .select("ladder_position")
+            .eq("user_id", user.id)
+            .eq("show_id", showId)
+            .maybeSingle(),
         ]);
 
         if (isCancelled) return;
 
         const savedShowsData = savedShowsResult?.data || [];
 
-        if (rankingRowsResult?.error) throw rankingRowsResult.error;
+        if (rankingRowResult?.error) throw rankingRowResult.error;
 
-        const rankingRows = (rankingRowsResult?.data || []).map((row) => ({
-          show_id: row.show_id,
-          rating: row.rating,
-          wins: row.wins,
-          losses: row.losses,
-          comparisons: row.comparisons,
-          show_name: row.shows?.name || "",
-        }));
-
-        const sortedRankings = [...rankingRows].sort(sortRankings);
-
-        const foundRankIndex = sortedRankings.findIndex(
-          (row) => String(row.show_id) === String(showId)
+        const ladderPosition = Number(rankingRowResult?.data?.ladder_position);
+        setRankPosition(
+          Number.isFinite(ladderPosition) && ladderPosition > 0
+            ? ladderPosition
+            : null
         );
-
-        setRankPosition(foundRankIndex >= 0 ? foundRankIndex + 1 : null);
 
         const savedTvdbIds = new Set(
           savedShowsData
@@ -649,7 +633,8 @@ const burgrTouchRef = useRef({
         setWatchedLoaded(true);
         setBurgrRatings(burgrRows || []);
         setMyBurgrRating(mine ? String(mine.rating) : "");
-        setEpisodeRatings(episodeRatingRows || []);
+        setEpisodeRatings([]);
+        loadedEpisodeRatingSeasonsRef.current.clear();
         setSavingEpisodeRatingId(null);
         setHoverEpisodeRatings({});
         setOpenEpisodeRatingPickerId(null);
@@ -877,6 +862,32 @@ const burgrTouchRef = useRef({
   }, [routeId, targetEpisodeId, isTmdbRoute]);
 
   useEffect(() => {
+    if (!show) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.dispatchEvent(
+        new CustomEvent("burgrs:show-page-ready", {
+          detail: {
+            saved: true,
+            showId: show.id,
+            watchedLoaded,
+            extrasLoading,
+          },
+        })
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    show,
+    episodes,
+    watchedRows,
+    watchedLoaded,
+    extrasLoading,
+    rankPosition,
+  ]);
+
+  useEffect(() => {
     if (targetEpisodeId) return;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [routeId, targetEpisodeId]);
@@ -1057,11 +1068,21 @@ const burgrTouchRef = useRef({
   async function hydrateSeasonEpisodeDetails(seasonNumber) {
     if (!show?.id) return;
 
+    const seasonEpisodeIds = episodes
+      .filter((episode) => Number(episode.seasonNumber) === Number(seasonNumber))
+      .map((episode) => episode.id)
+      .filter(Boolean);
+    const ratingsKey = `${show.id}:${seasonNumber}`;
+    const shouldLoadRatings =
+      !loadedEpisodeRatingSeasonsRef.current.has(ratingsKey);
+
     try {
-      const rows = await fetchSeasonEpisodeDetailsCached(
-        show.id,
-        seasonNumber
-      );
+      const [rows, seasonRatings] = await Promise.all([
+        fetchSeasonEpisodeDetailsCached(show.id, seasonNumber),
+        shouldLoadRatings
+          ? fetchAllEpisodeRatingsForShowEpisodeIds(seasonEpisodeIds)
+          : Promise.resolve(null),
+      ]);
       const detailsById = new Map(rows.map((row) => [String(row.id), row]));
 
       setEpisodes((current) =>
@@ -1087,6 +1108,17 @@ const burgrTouchRef = useRef({
           };
         })
       );
+
+      if (seasonRatings) {
+        const seasonIdSet = new Set(seasonEpisodeIds.map(String));
+        setEpisodeRatings((current) => [
+          ...(current || []).filter(
+            (row) => !seasonIdSet.has(String(row.episode_id))
+          ),
+          ...seasonRatings,
+        ]);
+        loadedEpisodeRatingSeasonsRef.current.add(ratingsKey);
+      }
     } catch (error) {
       console.warn("Season episode details unavailable", error);
     }
@@ -1511,7 +1543,13 @@ const burgrTouchRef = useRef({
 
       if (error) throw error;
 
-      await refreshEpisodeRatings(episodes.map((episode) => episode.id));
+      const seasonEpisodeIds = episodes
+        .filter(
+          (episode) =>
+            Number(episode.seasonNumber) === Number(ep.seasonNumber)
+        )
+        .map((episode) => episode.id);
+      await refreshEpisodeRatings(seasonEpisodeIds);
       setHoverEpisodeRatings((prev) => {
         const next = { ...prev };
         delete next[String(ep.id)];
