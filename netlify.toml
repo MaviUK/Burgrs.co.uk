@@ -1,5 +1,5 @@
 [build]
-  command = "node scripts/syncNytTop100.mjs && npm run build"
+  command = "npm run build"
   publish = "dist"
 
 [functions]
@@ -48,4 +48,3 @@
 
 # Deployment retry after correcting Netlify environment configuration.
 
-# One-off NYT catalog sync
