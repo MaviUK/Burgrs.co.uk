@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { fetchShowExtrasCached } from "./lib/showExtrasCache";
 
 const routeCache = new Map();
 let scheduled = false;
@@ -79,13 +80,10 @@ function sortEpisodes(items) {
 
 async function fetchExtras(route) {
   try {
-    const url =
-      route.source === "tmdb"
-        ? `/.netlify/functions/getTmdbShowDetails?tmdbId=${encodeURIComponent(route.id)}`
-        : `/.netlify/functions/getShowExtras?tvdbId=${encodeURIComponent(route.id)}`;
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    return await response.json();
+    return await fetchShowExtrasCached({
+      source: route.source,
+      id: route.id,
+    });
   } catch (error) {
     console.warn("Show page extras unavailable", error);
     return null;
