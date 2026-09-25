@@ -1,5 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { fetchShowExtrasCached } from "./lib/showExtrasCache";
+import { fetchShowCoreCached } from "./lib/showCoreCache";
 
 const routeCache = new Map();
 let scheduled = false;
@@ -135,35 +136,22 @@ function trailerUrlFromExtras(extras) {
 
 async function loadDatabaseContext(route) {
   try {
-    let query = supabase
-      .from("shows")
-      .select("id, tvdb_id, tmdb_id, name, status")
-      .limit(1);
+    const core = await fetchShowCoreCached({
+      source: route.source,
+      id: route.id,
+    });
 
-    query =
-      route.source === "tmdb"
-        ? query.eq("tmdb_id", Number(route.id))
-        : query.eq("tvdb_id", Number(route.id));
+    const showRow = core.show || null;
+    if (!showRow?.id) return { episodes: [], watchedIds: new Set() };
 
-    const { data: showRow, error: showError } = await query.maybeSingle();
-    if (showError || !showRow?.id) return { episodes: [], watchedIds: new Set() };
-
-    const { data: episodeRows, error: episodeError } = await supabase
-      .from("episodes")
-      .select("id, season_number, episode_number, name, aired_date")
-      .eq("show_id", showRow.id)
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true });
-
-    if (episodeError) return { episodes: [], watchedIds: new Set() };
-
-    const episodes = (episodeRows || []).map(normalizeEpisode);
+    const episodes = (core.episodes || []).map(normalizeEpisode);
     const watchedIds = new Set();
 
     if (route.saved && episodes.length) {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user || null;
 
       if (user?.id) {
         const ids = episodes.map((episode) => episode.id).filter(Boolean);
@@ -175,7 +163,9 @@ async function loadDatabaseContext(route) {
             .select("episode_id")
             .eq("user_id", user.id)
             .in("episode_id", chunk);
-          (watchedRows || []).forEach((row) => watchedIds.add(String(row.episode_id)));
+          (watchedRows || []).forEach((row) =>
+            watchedIds.add(String(row.episode_id))
+          );
         }
       }
     }
