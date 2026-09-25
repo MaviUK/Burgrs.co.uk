@@ -1137,6 +1137,18 @@ const burgrTouchRef = useRef({
     }
   }
 
+  useEffect(() => {
+    if (!targetEpisodeId || !show?.id || !episodes.length) return;
+
+    const targetEpisode = episodes.find(
+      (episode) => String(episode.id) === String(targetEpisodeId)
+    );
+
+    if (targetEpisode) {
+      void hydrateSeasonEpisodeDetails(targetEpisode.seasonNumber);
+    }
+  }, [targetEpisodeId, show?.id, episodes.length]);
+
   async function refreshBurgrRatings(showId, userId) {
     const fresh = await fetchBurgrRatings(showId);
     setBurgrRatings(fresh);
@@ -1146,7 +1158,14 @@ const burgrTouchRef = useRef({
 
   async function refreshEpisodeRatings(showEpisodeIds) {
     const fresh = await fetchAllEpisodeRatingsForShowEpisodeIds(showEpisodeIds);
-    setEpisodeRatings(fresh);
+    const idSet = new Set((showEpisodeIds || []).map(String));
+
+    setEpisodeRatings((current) => [
+      ...(current || []).filter(
+        (row) => !idSet.has(String(row.episode_id))
+      ),
+      ...fresh,
+    ]);
   }
 
   async function handleToggleRemoveShow() {
