@@ -6,6 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { fetchShowExtrasCached } from "../lib/showExtrasCache";
 import ShowReviews from "../components/ShowReviews";
 import EpisodeReviews from "../components/EpisodeReviews";
 import ShowChatBoard from "../components/ShowChatBoard";
@@ -667,17 +668,10 @@ const burgrTouchRef = useRef({
         try {
           setExtrasLoading(true);
 
-          const extrasUrl =
-            tvdbId != null
-              ? `/.netlify/functions/getShowExtras?tvdbId=${tvdbId}`
-              : `/.netlify/functions/getTmdbShowDetails?tmdbId=${tmdbIdValue}`;
-
-          const extrasRes = await fetch(extrasUrl);
-          if (!extrasRes.ok) {
-            throw new Error(`Failed to load show extras (${extrasRes.status})`);
-          }
-
-          const extras = await extrasRes.json();
+          const extras = await fetchShowExtrasCached({
+            source: tvdbId != null ? "tvdb" : "tmdb",
+            id: tvdbId != null ? tvdbId : tmdbIdValue,
+          });
 
           let providers = null;
 
