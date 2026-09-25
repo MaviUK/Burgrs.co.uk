@@ -778,6 +778,24 @@ export default function ShowDetails() {
     sourceRating
   )}&sourceLanguage=${encodeURIComponent(sourceLanguage)}`;
 
+  useEffect(() => {
+    if (!show) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.dispatchEvent(
+        new CustomEvent("burgrs:show-page-ready", {
+          detail: {
+            saved: false,
+            showId: show.id,
+            extrasLoading,
+          },
+        })
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [show, episodes, extrasLoading]);
+
   async function hydrateSeasonEpisodeDetails(seasonNumber) {
     if (!show?.id) return;
 
