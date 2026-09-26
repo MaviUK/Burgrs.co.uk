@@ -1868,7 +1868,7 @@ const burgrTouchRef = useRef({
                   style={
                     communityBurgrStats.average != null
                       ? {
-                          color: getBurgrGradientColor(
+                          "--burgr-average-color": getBurgrGradientColor(
                             communityBurgrStats.average
                           ),
                         }
