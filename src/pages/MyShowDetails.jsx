@@ -1025,6 +1025,14 @@ const burgrTouchRef = useRef({
       });
   }, [episodes, watchedLookup]);
 
+  const specialEpisodes = useMemo(
+    () =>
+      [...episodes]
+        .filter((ep) => Number(ep.seasonNumber ?? 0) === 0)
+        .sort((a, b) => Number(a.number ?? 0) - Number(b.number ?? 0)),
+    [episodes]
+  );
+
   const stats = useMemo(() => {
     const mainEpisodes = episodes.filter(
       (ep) => Number(ep.seasonNumber ?? 0) !== 0
@@ -2048,6 +2056,18 @@ const burgrTouchRef = useRef({
               Seasons
             </button>
 
+            {specialEpisodes.length > 0 ? (
+              <button
+                type="button"
+                className={`msd-content-tab ${
+                  activeTab === "specials" ? "is-active" : ""
+                }`}
+                onClick={() => openContentTab("specials")}
+              >
+                Specials
+              </button>
+            ) : null}
+
             <button
               type="button"
               className={`msd-content-tab ${
@@ -2417,6 +2437,39 @@ const burgrTouchRef = useRef({
                       )}
                     </section>
                   ))}
+                </div>
+              </>
+            )}
+
+            {activeTab === "specials" && (
+              <>
+                <h2 className="msd-section-title">Specials</h2>
+                <div className="burgr-specials-list msd-specials-tab-list">
+                  {specialEpisodes.map((ep) => {
+                    const watched = isEpisodeWatched(ep, watchedLookup);
+
+                    return (
+                      <article
+                        id={`episode-${ep.id}`}
+                        key={ep.id}
+                        className={`burgr-special-row msd-specials-tab-row ${
+                          watched ? "is-watched" : ""
+                        }`}
+                      >
+                        <div className="msd-specials-tab-copy">
+                          <strong>
+                            {makeEpisodeCode(ep)} · {ep.name}
+                          </strong>
+                          <span>{formatDate(ep.aired)}</span>
+                        </div>
+                        {watched ? (
+                          <span className="msd-specials-watched-badge">
+                            Watched
+                          </span>
+                        ) : null}
+                      </article>
+                    );
+                  })}
                 </div>
               </>
             )}
