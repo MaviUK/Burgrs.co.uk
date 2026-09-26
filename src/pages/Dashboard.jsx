@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v14_SMART_UP_NEXT";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v15_CATCH_UP_CARDS";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -193,6 +193,14 @@ function getDisplayEpisodeCode(ep) {
   return `S${String(ep.seasonNumber).padStart(2, "0")}E${String(
     ep.episodeNumber
   ).padStart(2, "0")}`;
+}
+
+function getEpisodeDisplayName(ep) {
+  const name = String(ep?.name || "").trim();
+  if (!name || /^tba$/i.test(name) || /^tbd$/i.test(name)) {
+    return `Episode ${Number(ep?.episodeNumber || ep?.episode_number || 0) || ""}`.trim();
+  }
+  return name;
 }
 
 function getSavedShowLink(show) {
@@ -631,7 +639,7 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       (item) =>
         !upNext || String(item.show?.show_id || "") !== String(upNext.show?.show_id || "")
     )
-    .slice(0, 8);
+    .slice(0, 6);
 
   const caughtUpShowIds = new Set(
     visibleShows
@@ -705,23 +713,24 @@ function Poster({ src, alt, className }) {
 
 function ContinueWatchingCard({ item }) {
   const { show, episode, watchedCount, totalAired, progress, episodesBehind } = item;
+  const behindLabel = episodesBehind
+    ? `${episodesBehind} episode${episodesBehind === 1 ? "" : "s"} behind`
+    : `${watchedCount} of ${totalAired} aired episodes watched`;
 
   return (
     <Link to={getSavedShowLink(show)} className="continue-card">
       <Poster src={show.poster_url} alt={show.show_name} className="continue-card-poster" />
       <div className="continue-card-copy">
-        <strong>{show.show_name || "Unknown show"}</strong>
-        <span>
-          {getDisplayEpisodeCode(episode)} · {episode.name || "Next episode"}
-        </span>
+        <div className="continue-card-heading">
+          <strong>{show.show_name || "Unknown show"}</strong>
+          {episodesBehind ? <span className="catch-up-count">{behindLabel}</span> : null}
+        </div>
+        <span className="catch-up-next-label">Next · {getDisplayEpisodeCode(episode)}</span>
+        <span className="catch-up-episode-title">{getEpisodeDisplayName(episode)}</span>
         <div className="continue-progress" aria-label={`${progress}% watched`}>
           <span style={{ width: `${Math.max(3, progress)}%` }} />
         </div>
-        <small>
-          {episodesBehind
-            ? `${episodesBehind} episode${episodesBehind === 1 ? "" : "s"} to catch up`
-            : `${watchedCount} of ${totalAired} aired episodes watched`}
-        </small>
+        {!episodesBehind ? <small>{behindLabel}</small> : null}
       </div>
     </Link>
   );
@@ -735,7 +744,7 @@ function DashboardEpisodeItem({ show, episode, episodes = [] }) {
   const lastEpisode = releaseEpisodes[releaseEpisodes.length - 1];
   const isBatchRelease = releaseEpisodes.length > 1;
 
-  let releaseLabel = `${getDisplayEpisodeCode(firstEpisode)} · ${firstEpisode.name || "New episode"}`;
+  let releaseLabel = `${getDisplayEpisodeCode(firstEpisode)} · ${getEpisodeDisplayName(firstEpisode)}`;
 
   if (isBatchRelease) {
     const sameSeason = releaseEpisodes.every(
@@ -817,7 +826,7 @@ function UpNextHero({ item }) {
         <h1>{show.show_name || "Unknown show"}</h1>
         <p>
           <strong>{getDisplayEpisodeCode(episode)}</strong>
-          <span> · {episode.name || "Next episode"}</span>
+          <span> · {getEpisodeDisplayName(episode)}</span>
         </p>
         <div className="up-next-progress" aria-label={`${progress}% watched`}>
           <span style={{ width: `${Math.max(3, progress)}%` }} />
