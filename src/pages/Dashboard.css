@@ -755,3 +755,39 @@
     height: 116px;
   }
 }
+
+
+/* Keep the Home search on the BURGRS pink palette, overriding legacy purple focus styles. */
+.dashboard-page .dashboard-home-search input,
+.dashboard-page .dashboard-home-search input:focus,
+.dashboard-page .dashboard-home-search input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+
+.dashboard-page .dashboard-home-search input::placeholder {
+  color: #748198 !important;
+}
+
+.dashboard-page .dashboard-home-search:focus-within {
+  border-color: rgba(151, 7, 71, 0.82) !important;
+  box-shadow: 0 0 0 3px rgba(151, 7, 71, 0.16) !important;
+}
+
+.dashboard-page .dashboard-home-search button[type="submit"],
+.dashboard-page .dashboard-home-search button[type="submit"]:hover,
+.dashboard-page .dashboard-home-search button[type="submit"]:focus-visible {
+  background: #970747 !important;
+  border-color: #970747 !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(151, 7, 71, 0.2) !important;
+}
+
+.dashboard-page .dashboard-home-search button[type="submit"]:hover,
+.dashboard-page .dashboard-home-search button[type="submit"]:focus-visible {
+  background: #7f063c !important;
+  border-color: #7f063c !important;
+}
