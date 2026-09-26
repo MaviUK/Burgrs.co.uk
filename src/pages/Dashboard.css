@@ -791,3 +791,63 @@
   background: #7f063c !important;
   border-color: #7f063c !important;
 }
+
+
+/* Catch Up cards */
+.continue-card-heading {
+  display: flex;
+  min-width: 0;
+  gap: 7px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.continue-card-heading strong {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.catch-up-count {
+  flex: 0 0 auto;
+  max-width: 104px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(151, 7, 71, 0.2);
+  color: #ff9bc3 !important;
+  font-size: 9px !important;
+  font-weight: 900;
+  line-height: 1.1 !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.continue-card-copy .catch-up-next-label {
+  color: #ff8abb;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+}
+
+.continue-card-copy .catch-up-episode-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #d7dfef;
+  font-size: 12px;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.dashboard-continue-section .continue-progress > span {
+  background: #970747;
+}
+
+@media (max-width: 640px) {
+  .catch-up-count {
+    max-width: 94px;
+    font-size: 8px !important;
+  }
+}
