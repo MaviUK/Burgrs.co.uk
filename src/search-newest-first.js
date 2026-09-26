@@ -152,6 +152,21 @@ function getTitleMatchScore(card, query) {
   return 0;
 }
 
+function applySortedCardOrder(list, sorted) {
+  const current = Array.from(list.children).filter((child) =>
+    child.classList?.contains('search-result-banner-card')
+  );
+
+  const alreadySorted =
+    current.length === sorted.length &&
+    current.every((card, index) => card === sorted[index]);
+
+  if (alreadySorted) return false;
+
+  sorted.forEach((card) => list.appendChild(card));
+  return true;
+}
+
 function sortTitleResultsByRelevance(list, cards) {
   const query = document.querySelector('.search-page-input')?.value || '';
 
@@ -173,7 +188,7 @@ function sortTitleResultsByRelevance(list, cards) {
     return aTitle.localeCompare(bTitle);
   });
 
-  sorted.forEach((card) => list.appendChild(card));
+  applySortedCardOrder(list, sorted);
 }
 
 function sortSearchResults() {
@@ -204,7 +219,7 @@ function sortSearchResults() {
     return aTitle.localeCompare(bTitle);
   });
 
-  sorted.forEach((card) => list.appendChild(card));
+  applySortedCardOrder(list, sorted);
 }
 
 let scheduled = false;
