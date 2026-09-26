@@ -256,6 +256,14 @@ export default function StreamingProvider() {
   }, [loading, loadingMore, error, page, totalPages, endpointBase, sort, genre]);
 
   const headingName = provider?.name || providerNameHint || "Streaming service";
+  const visibleShows = useMemo(() => {
+    if (page >= totalPages) return shows;
+
+    const incompleteRowCount = shows.length % 3;
+    return incompleteRowCount > 0
+      ? shows.slice(0, shows.length - incompleteRowCount)
+      : shows;
+  }, [shows, page, totalPages]);
 
   return (
     <main className="page streaming-provider-page">
@@ -331,7 +339,7 @@ export default function StreamingProvider() {
       {!loading && shows.length > 0 ? (
         <>
           <section className="streaming-show-grid">
-            {shows.map((show) => (
+            {visibleShows.map((show) => (
               <StreamingShowCard
                 show={show}
                 key={show.tmdb_id || show.tvdb_id || show.id}
