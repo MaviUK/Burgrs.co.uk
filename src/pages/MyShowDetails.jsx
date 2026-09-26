@@ -73,6 +73,26 @@ function getYear(dateString) {
   return String(d.getFullYear());
 }
 
+
+function getBurgrGradientColor(value) {
+  const rating = Math.max(0, Math.min(100, Number(value) || 0));
+  const orange = [249, 115, 22];
+  const purple = [168, 85, 247];
+  const green = [34, 197, 94];
+
+  const interpolate = (from, to, amount) =>
+    from.map((channel, index) =>
+      Math.round(channel + (to[index] - channel) * amount)
+    );
+
+  const rgb =
+    rating <= 50
+      ? interpolate(orange, purple, rating / 50)
+      : interpolate(purple, green, (rating - 50) / 50);
+
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
 function sortSeasonGroups(a, b) {
   const aNum = Number(a[0]);
   const bNum = Number(b[0]);
@@ -1834,19 +1854,30 @@ const burgrTouchRef = useRef({
                 </strong>
               </div>
 
-              <div className="msd-stat-box msd-community-rating-stat">
-                <span className="msd-stat-label">Burgr Avg</span>
-                <strong className="msd-stat-value">
-                  {communityBurgrStats.average != null
-                    ? `${Math.round(communityBurgrStats.average)}%`
-                    : "—"}
-                </strong>
-              </div>
-
               <div className="msd-stat-box">
                 <span className="msd-stat-label">Progress</span>
                 <strong className="msd-stat-value">
                   {watchedLoaded ? `${stats.pct}%` : "..."}
+                </strong>
+              </div>
+
+              <div className="msd-stat-box msd-community-rating-stat">
+                <span className="msd-stat-label">Burgr Avg</span>
+                <strong
+                  className="msd-stat-value"
+                  style={
+                    communityBurgrStats.average != null
+                      ? {
+                          color: getBurgrGradientColor(
+                            communityBurgrStats.average
+                          ),
+                        }
+                      : undefined
+                  }
+                >
+                  {communityBurgrStats.average != null
+                    ? `${Math.round(communityBurgrStats.average)}%`
+                    : "—"}
                 </strong>
               </div>
 
