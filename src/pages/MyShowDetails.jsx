@@ -572,7 +572,7 @@ const burgrTouchRef = useRef({
         setExpandedSeasons(seasonMap);
         setMobileBannerUrl(showData.backdrop_url || null);
         setExpandedOverview(false);
-        setActiveTab("seasons");
+        setActiveTab(targetEpisodeSeason === 0 ? "specials" : "seasons");
         setWatchProviders(null);
         setWatchOptionsOpen(false);
       }
@@ -984,7 +984,7 @@ const burgrTouchRef = useRef({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [episodes, expandedSeasons, targetEpisodeId, loading]);
+  }, [episodes, expandedSeasons, targetEpisodeId, loading, activeTab]);
 
   useEffect(() => {
   if (!overviewRef.current) return;
