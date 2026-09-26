@@ -166,15 +166,6 @@ function createWatchDropdown(providerGroups) {
     dropdown.appendChild(section);
   });
 
-  if (providerGroups.link) {
-    const sourceLink = document.createElement("a");
-    sourceLink.href = providerGroups.link;
-    sourceLink.target = "_blank";
-    sourceLink.rel = "noreferrer";
-    sourceLink.className = "public-watch-source-link";
-    sourceLink.textContent = "View full availability";
-    dropdown.appendChild(sourceLink);
-  }
 
   return dropdown;
 }
