@@ -759,32 +759,66 @@ export default function FollowingFeed() {
               const commentKey = `post-${post.id}`;
 
               return (
-                <article key={`post-${post.id}`} className="following-card">
+                <article
+                  key={`post-${post.id}`}
+                  className={`following-card${post.is_auto_news ? " following-card-news" : ""}`}
+                >
                   <CreatorLine
                     profile={post.profiles}
                     userId={post.user_id}
                     createdAt={post.created_at}
-                    activityLabel={formatPostType(post.post_type)}
+                    activityLabel={post.is_auto_news ? "TV News" : formatPostType(post.post_type)}
                     comments={renderCommentButton(commentKey, "post")}
                   />
-                  <VideoEmbed post={post} />
-                  {!post.video_embed_url && post.image_url ? (
-                    <img src={post.image_url} alt="" className="following-post-image" />
-                  ) : null}
-                  {post.title ? <h2 className="following-post-title">{post.title}</h2> : null}
-                  {post.body ? <p className="following-review-text">{post.body}</p> : null}
+
                   {post.is_auto_news ? (
-                    <div className="following-news-links">
-                      {post.related_show_id ? (
-                        <Link to={`/show/${post.related_show_id}`}>View show</Link>
+                    <div className={`following-news-story${post.image_url ? "" : " no-image"}`}>
+                      {post.image_url ? (
+                        post.related_show_id ? (
+                          <Link to={`/show/${post.related_show_id}`} className="following-news-poster-link">
+                            <img src={post.image_url} alt="" className="following-news-poster" />
+                          </Link>
+                        ) : (
+                          <img src={post.image_url} alt="" className="following-news-poster" />
+                        )
                       ) : null}
-                      {post.source_url ? (
-                        <a href={post.source_url} target="_blank" rel="noreferrer">
-                          Source{post.source_name ? `: ${post.source_name}` : ""}
-                        </a>
-                      ) : null}
+
+                      <div className="following-news-copy">
+                        <div className="following-news-kicker">
+                          <span>Latest</span>
+                          {post.source_name ? <em>{post.source_name}</em> : null}
+                        </div>
+                        {post.title ? <h2 className="following-news-title">{post.title}</h2> : null}
+                        <div className="following-news-actions">
+                          {post.related_show_id ? (
+                            <Link to={`/show/${post.related_show_id}`} className="following-news-action following-news-action-primary">
+                              View show
+                            </Link>
+                          ) : null}
+                          {post.source_url ? (
+                            <a
+                              href={post.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="following-news-action"
+                            >
+                              Read source
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <>
+                      <VideoEmbed post={post} />
+                      {!post.video_embed_url && post.image_url ? (
+                        <img src={post.image_url} alt="" className="following-post-image" />
+                      ) : null}
+                      {post.title ? <h2 className="following-post-title">{post.title}</h2> : null}
+                      {post.body ? <p className="following-review-text">{post.body}</p> : null}
+                    </>
+                  )}
+
                   <FeedComments
                     inline
                     hideToggle
