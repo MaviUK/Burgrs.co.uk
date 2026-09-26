@@ -878,7 +878,7 @@ export default function ShowDetails() {
       if (show?.tvdb_id) {
         navigate(`/my-shows/${show.tvdb_id}`, { replace: true });
       } else if (show?.tmdb_id) {
-        navigate(`/show/tmdb/${show.tmdb_id}`, { replace: true });
+        navigate(`/my-shows/tmdb/${show.tmdb_id}`, { replace: true });
       }
     } catch (err) {
       console.error("Failed to add show:", err);
