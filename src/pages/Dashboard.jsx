@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v17_NEW_TODAY";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v18_EDITORIAL_NEWS";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -933,7 +933,15 @@ function UpNextHero({ item }) {
   );
 }
 
-function NewsCard({ story }) {
+function NewsCard({ story, featured = false, compact = false }) {
+  const className = [
+    "dashboard-news-card",
+    featured ? "is-featured" : "",
+    compact ? "is-compact" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const card = (
     <>
       {story.image_url ? (
@@ -944,6 +952,7 @@ function NewsCard({ story }) {
       <div className="dashboard-news-copy">
         <span>{story.source_name || "TV News"}</span>
         <strong>{story.title || "Latest TV news"}</strong>
+        {featured ? <em>Read story <b aria-hidden="true">›</b></em> : null}
       </div>
     </>
   );
@@ -954,7 +963,7 @@ function NewsCard({ story }) {
         href={story.source_url}
         target="_blank"
         rel="noreferrer"
-        className="dashboard-news-card"
+        className={className}
       >
         {card}
       </a>
@@ -963,13 +972,13 @@ function NewsCard({ story }) {
 
   if (story.related_show_id) {
     return (
-      <Link to={`/show/${story.related_show_id}`} className="dashboard-news-card">
+      <Link to={`/show/${story.related_show_id}`} className={className}>
         {card}
       </Link>
     );
   }
 
-  return <div className="dashboard-news-card">{card}</div>;
+  return <div className={className}>{card}</div>;
 }
 
 function FriendPickCard({ show }) {
@@ -1238,10 +1247,15 @@ export default function Dashboard() {
       {newsStories.length > 0 ? (
         <section className="dashboard-personal-section dashboard-news-section">
           <SectionHeader title="TV News" to="/following" linkLabel="View feed" />
-          <div className="dashboard-news-row">
-            {newsStories.map((story) => (
-              <NewsCard key={story.id} story={story} />
-            ))}
+          <div className="dashboard-news-layout">
+            <NewsCard story={newsStories[0]} featured />
+            {newsStories.length > 1 ? (
+              <div className="dashboard-news-side">
+                {newsStories.slice(1, 3).map((story) => (
+                  <NewsCard key={story.id} story={story} compact />
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
