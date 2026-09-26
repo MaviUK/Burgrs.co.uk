@@ -2596,3 +2596,14 @@
     font-size: 0.54rem;
   }
 }
+
+
+a.msd-watch-card {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.msd-watch-card:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
