@@ -1,3 +1,5 @@
+import { persistDiscoveryShows } from "./_persistDiscoveryShows.js";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -142,6 +144,12 @@ async function fetchTmdbS01E01(tmdbId) {
   );
 }
 
+async function fetchTmdbExternalIds(tmdbId) {
+  return fetchTmdb(
+    `${TMDB_BASE_URL}/tv/${encodeURIComponent(tmdbId)}/external_ids`
+  );
+}
+
 function normalizeTmdbShow(show, episode) {
   if (!show?.id || !show?.poster_path || !episode?.air_date) return null;
 
@@ -159,6 +167,8 @@ function normalizeTmdbShow(show, episode) {
     premiere_episode_number: 1,
     premiere_episode_name: episode.name || "Episode 1",
     popularity: Number(show.popularity || 0),
+    vote_average: Number(show.vote_average || 0) || null,
+    vote_count: Number(show.vote_count || 0) || null,
     source: "tmdb",
   };
 }
@@ -297,7 +307,17 @@ async function loadTmdbPremieres(from, to) {
       if (!episode?.air_date || episode.air_date < from || episode.air_date > to) {
         return null;
       }
-      return normalizeTmdbShow(show, episode);
+      const normalized = normalizeTmdbShow(show, episode);
+      if (!normalized) return null;
+
+      try {
+        const externalIds = await fetchTmdbExternalIds(show.id);
+        normalized.tvdb_id = Number(externalIds?.tvdb_id || 0) || null;
+      } catch (externalIdError) {
+        console.warn(`TMDB external ID lookup failed for ${show.id}`, externalIdError);
+      }
+
+      return normalized;
     } catch (error) {
       console.warn(`TMDB S01E01 verification failed for ${show.id}`, error);
       return null;
@@ -390,9 +410,17 @@ export async function handler(event) {
 
     const shows = mergePremieres([...tmdbResults, ...tvdbResults]);
 
+    let persistence = null;
+    try {
+      persistence = await persistDiscoveryShows(shows);
+    } catch (persistError) {
+      console.error("Failed to persist premiering shows", persistError);
+    }
+
     return jsonResponse(200, {
       shows,
       meta: {
+        persistence,
         from,
         to,
         count: shows.length,
