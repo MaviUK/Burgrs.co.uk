@@ -2571,3 +2571,28 @@
   letter-spacing: 0.08em;
 }
 }
+
+
+.msd-stat-subvalue {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.msd-community-rating-stat .msd-stat-value {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .msd-stats-row-five .msd-community-rating-stat {
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
+  .msd-stat-subvalue {
+    font-size: 0.54rem;
+  }
+}
