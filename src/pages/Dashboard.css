@@ -851,3 +851,58 @@
     font-size: 8px !important;
   }
 }
+
+
+/* Upcoming streaming availability */
+.upcoming-provider-row {
+  display: flex;
+  min-width: 0;
+  margin-top: 2px;
+  gap: 5px;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.upcoming-provider-prefix {
+  flex: 0 0 auto;
+  color: #8492a9;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.upcoming-provider {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 145px;
+  gap: 4px;
+  align-items: center;
+  color: #f8fafc;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.upcoming-provider img {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.upcoming-provider > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .upcoming-provider:nth-of-type(n + 3) {
+    display: none;
+  }
+
+  .upcoming-provider {
+    max-width: 118px;
+  }
+}
