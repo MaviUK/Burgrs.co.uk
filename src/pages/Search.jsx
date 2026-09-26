@@ -138,6 +138,7 @@ export default function Search() {
   const [activeAdvancedQuery, setActiveAdvancedQuery] = useState("");
   const [activeAdvancedMode, setActiveAdvancedMode] = useState("");
 
+  const titleQuery = searchParams.get("q") || "";
   const genreFilter = searchParams.get("genre") || "";
   const networkFilter = searchParams.get("network") || "";
   const relationshipTypeFilter = searchParams.get("relationshipType") || "";
@@ -186,7 +187,10 @@ export default function Search() {
   }, []);
 
   useEffect(() => {
-    if (genreFilter) {
+    if (titleQuery) {
+      setSearchMode("title");
+      setQuery(titleQuery);
+    } else if (genreFilter) {
       setSearchMode("genre");
       setQuery(genreFilter);
     } else if (networkFilter) {
@@ -199,7 +203,7 @@ export default function Search() {
       setSearchMode("title");
       setQuery(settingFilter);
     }
-  }, [genreFilter, networkFilter, relationshipTypeFilter, settingFilter]);
+  }, [titleQuery, genreFilter, networkFilter, relationshipTypeFilter, settingFilter]);
 
   async function markAlreadySaved(results, userIdOverride = currentUserId) {
     const userId = userIdOverride || (await getCurrentUserId());
@@ -343,13 +347,18 @@ export default function Search() {
   }
 
   useEffect(() => {
+    if (!titleQuery) return;
+    fetchLegacySearch({ q: titleQuery });
+  }, [titleQuery]);
+
+  useEffect(() => {
     const hasFilter =
       Boolean(genreFilter) ||
       Boolean(networkFilter) ||
       Boolean(relationshipTypeFilter) ||
       Boolean(settingFilter);
 
-    if (!hasFilter) return;
+    if (!hasFilter || titleQuery) return;
 
     fetchLegacySearch({
       genre: genreFilter || null,
