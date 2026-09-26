@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v11_HOME_HUB";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v12_CATCH_UP";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -518,13 +518,16 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     }
   });
 
-  const continueWatching = visibleShows
-    .filter((show) => normalizeStatus(show.watch_status) === "watching")
-    .map((show) => {
+  const progressByShow = new Map(
+    visibleShows.map((show) => {
       const showKey = String(show.show_id);
       const showEpisodes = episodesByShow.get(showKey) || [];
-      const airedEpisodes = showEpisodes.filter((episode) => episode.aired && hasAired(episode.aired));
-      const watchedCount = airedEpisodes.filter((episode) => watchedIds.has(String(episode.id))).length;
+      const airedEpisodes = showEpisodes.filter(
+        (episode) => episode.aired && hasAired(episode.aired)
+      );
+      const watchedCount = airedEpisodes.filter((episode) =>
+        watchedIds.has(String(episode.id))
+      ).length;
 
       let lastWatchedIndex = -1;
       airedEpisodes.forEach((episode, index) => {
@@ -533,45 +536,66 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
         }
       });
 
-      const nextEpisode =
-        lastWatchedIndex < 0
-          ? airedEpisodes.find((episode) => !watchedIds.has(String(episode.id))) || null
-          : airedEpisodes
-              .slice(lastWatchedIndex + 1)
-              .find((episode) => !watchedIds.has(String(episode.id))) || null;
+      // Only count unwatched episodes from the user's current position onward.
+      // This preserves the existing behaviour for users who intentionally
+      // started a show at a later season.
+      const relevantAiredEpisodes =
+        lastWatchedIndex < 0 ? airedEpisodes : airedEpisodes.slice(lastWatchedIndex + 1);
+      const unwatchedFromCurrentPosition = relevantAiredEpisodes.filter(
+        (episode) => !watchedIds.has(String(episode.id))
+      );
+      const nextEpisode = unwatchedFromCurrentPosition[0] || null;
 
-      if (!nextEpisode) return null;
-
-      return {
-        show,
-        episode: nextEpisode,
-        watchedCount,
-        totalAired: airedEpisodes.length,
-        lastWatchedAt: latestWatchedAtByShow.get(showKey) || 0,
-        progress: airedEpisodes.length
-          ? Math.round((watchedCount / airedEpisodes.length) * 100)
-          : 0,
-      };
+      return [
+        showKey,
+        {
+          show,
+          episode: nextEpisode,
+          episodesBehind: unwatchedFromCurrentPosition.length,
+          watchedCount,
+          totalAired: airedEpisodes.length,
+          lastWatchedAt: latestWatchedAtByShow.get(showKey) || 0,
+          progress: airedEpisodes.length
+            ? Math.round((watchedCount / airedEpisodes.length) * 100)
+            : 0,
+        },
+      ];
     })
-    .filter(Boolean)
+  );
+
+  const continueWatching = visibleShows
+    .filter((show) => normalizeStatus(show.watch_status) === "watching")
+    .map((show) => progressByShow.get(String(show.show_id)))
+    .filter((item) => item?.episode && item.episodesBehind > 0)
     .sort((a, b) => {
       if (b.lastWatchedAt !== a.lastWatchedAt) return b.lastWatchedAt - a.lastWatchedAt;
+      if (a.episodesBehind !== b.episodesBehind) return a.episodesBehind - b.episodesBehind;
       return b.progress - a.progress;
     })
     .slice(0, 8);
 
+  const caughtUpShowIds = new Set(
+    visibleShows
+      .filter((show) => {
+        const progress = progressByShow.get(String(show.show_id));
+        return progress && progress.episodesBehind === 0;
+      })
+      .map((show) => String(show.show_id))
+  );
+
   const airingThisWeek = regularEpisodes
     .filter((episode) => {
-      if (!showsById.has(String(episode.show_id))) return false;
+      const showKey = String(episode.show_id);
+      if (!showsById.has(showKey) || !caughtUpShowIds.has(showKey)) return false;
       if (!episode.aired || !isDateWithinNextDays(episode.aired, 7)) return false;
-      return !watchedIds.has(String(episode.id));
+      return !hasAired(episode.aired) && !watchedIds.has(String(episode.id));
     })
     .sort((a, b) => {
       if (a.aired !== b.aired) return a.aired.localeCompare(b.aired);
       if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber;
       return a.episodeNumber - b.episodeNumber;
     })
-    .slice(0, 8)
+    .slice(0, 12)
     .map((episode) => ({ show: showsById.get(String(episode.show_id)), episode }));
 
   const recentlyAdded = [...visibleShows]
@@ -621,7 +645,7 @@ function Poster({ src, alt, className }) {
 }
 
 function ContinueWatchingCard({ item }) {
-  const { show, episode, watchedCount, totalAired, progress } = item;
+  const { show, episode, watchedCount, totalAired, progress, episodesBehind } = item;
 
   return (
     <Link to={getSavedShowLink(show)} className="continue-card">
@@ -635,7 +659,9 @@ function ContinueWatchingCard({ item }) {
           <span style={{ width: `${Math.max(3, progress)}%` }} />
         </div>
         <small>
-          {watchedCount} of {totalAired} aired episodes watched
+          {episodesBehind
+            ? `${episodesBehind} episode${episodesBehind === 1 ? "" : "s"} to catch up`
+            : `${watchedCount} of ${totalAired} aired episodes watched`}
         </small>
       </div>
     </Link>
@@ -989,7 +1015,7 @@ export default function Dashboard() {
 
       {dashboardView.isSignedIn && continueWatching.length > 0 ? (
         <section className="dashboard-personal-section dashboard-continue-section">
-          <SectionHeader title="Continue Watching" to="/my-shows" />
+          <SectionHeader title="Catch Up" to="/my-shows" />
           <div className="continue-row">
             {continueWatching.map((item) => (
               <ContinueWatchingCard key={`continue-${item.show.show_id}`} item={item} />
@@ -1000,7 +1026,7 @@ export default function Dashboard() {
 
       {dashboardView.isSignedIn && upcomingGroups.length > 0 ? (
         <section className="dashboard-personal-section dashboard-this-week-section">
-          <SectionHeader title="This Week" to="/calendar" linkLabel="Calendar" />
+          <SectionHeader title="Upcoming This Week" to="/calendar" linkLabel="Calendar" />
           <div className="dashboard-week-groups">
             {upcomingGroups.map((group) => (
               <div key={group.key} className="dashboard-day-group">
