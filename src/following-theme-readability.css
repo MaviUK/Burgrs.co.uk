@@ -112,6 +112,12 @@
 }
 
 .following-page .following-creator-meta-row .feed-comments-inline-toggle {
+  color: #475569 !important;
+}
+
+.following-page .following-creator-meta-row .feed-comments-inline-toggle:hover,
+.following-page .following-creator-meta-row .feed-comments-inline-toggle:focus-visible,
+.following-page .following-creator-meta-row .feed-comments-inline-toggle[aria-expanded="true"] {
   color: #970747 !important;
 }
 
