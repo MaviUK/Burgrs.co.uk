@@ -273,3 +273,7 @@
     background: #ffffff !important;
   }
 }
+
+.msd-page .msd-community-rating-stat .msd-stat-value {
+  color: var(--burgr-average-color, #f8fafc) !important;
+}
