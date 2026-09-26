@@ -178,23 +178,38 @@ function polishSearchCards() {
     .forEach(enhanceSearchCard);
 }
 
+const searchCardObserverOptions = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["class", "disabled", "href"],
+};
+
+function observeSearchCards() {
+  searchCardObserver.observe(document.documentElement, searchCardObserverOptions);
+}
+
 function scheduleSearchCardPolish() {
   if (searchCardPolishScheduled) return;
   searchCardPolishScheduled = true;
 
   window.requestAnimationFrame(() => {
     searchCardPolishScheduled = false;
-    polishSearchCards();
+
+    // The polish step deliberately changes classes and child nodes. Pause the
+    // observer while doing that so our own DOM changes do not trigger another
+    // polish on every animation frame.
+    searchCardObserver.disconnect();
+    try {
+      polishSearchCards();
+    } finally {
+      observeSearchCards();
+    }
   });
 }
 
 const searchCardObserver = new MutationObserver(scheduleSearchCardPolish);
-searchCardObserver.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ["class", "disabled", "href"],
-});
+observeSearchCards();
 
 window.addEventListener("pageshow", scheduleSearchCardPolish);
 window.addEventListener("popstate", scheduleSearchCardPolish);
