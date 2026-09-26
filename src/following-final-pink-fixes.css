@@ -43,3 +43,81 @@
   border-radius: 0 !important;
   box-shadow: none !important;
 }
+
+
+/* List cards use the same BURGRS pink/burgundy accent as the app chrome. */
+.following-page .following-card-list .creator-list-cover-topline span {
+  background: rgba(151, 7, 71, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(151, 7, 71, 0.2) !important;
+}
+
+.following-page .following-card-list .creator-list-cover-topline span:last-child {
+  background: #970747 !important;
+  border-color: #b00956 !important;
+}
+
+.following-page .following-card-list .following-list-actions-row {
+  background:
+    linear-gradient(180deg, rgba(151, 7, 71, 0.12), rgba(2, 6, 23, 0.96)) !important;
+  border-top-color: rgba(151, 7, 71, 0.34) !important;
+}
+
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-share-proxy,
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-comments-proxy {
+  color: #f3b4cf !important;
+  -webkit-text-fill-color: #f3b4cf !important;
+}
+
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-share-proxy:hover,
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-share-proxy:focus-visible,
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-comments-proxy:hover,
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-comments-proxy:focus-visible,
+.following-page
+  .following-card-list
+  .following-list-actions-row
+  .following-list-comments-proxy.is-open {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-decoration-color: #970747 !important;
+}
+
+.following-page .following-card-list .creator-rank {
+  color: #f8d7e5 !important;
+  -webkit-text-fill-color: #f8d7e5 !important;
+  background: rgba(151, 7, 71, 0.2) !important;
+  border-color: rgba(176, 9, 86, 0.34) !important;
+}
+
+.following-page .following-card-list .creator-list-item:nth-child(-n + 3) .creator-rank {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: #970747 !important;
+  border-color: #b00956 !important;
+}
+
+.following-page .following-card-list .creator-list-item em {
+  color: #f3b4cf !important;
+  -webkit-text-fill-color: #f3b4cf !important;
+  background: rgba(151, 7, 71, 0.14) !important;
+}
