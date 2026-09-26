@@ -445,6 +445,7 @@ export default function MyShows() {
         added_at: row.added_at,
         created_at: row.created_at,
         tvdb_id: row.shows.tvdb_id,
+        tmdb_id: row.shows.tmdb_id,
         show_name: getPreferredShowName(row.shows),
         overview: row.shows.overview || "",
         status: row.shows.status || null,
@@ -800,7 +801,13 @@ export default function MyShows() {
           {displayedShows.map((show) => (
             <Link
               key={show.show_id}
-              to={`/my-shows/${show.tvdb_id}`}
+              to={
+                show.tvdb_id
+                  ? `/my-shows/${show.tvdb_id}`
+                  : show.tmdb_id
+                    ? `/my-shows/tmdb/${show.tmdb_id}`
+                    : "/my-shows"
+              }
               style={{
                 textDecoration: "none",
                 color: "inherit",
