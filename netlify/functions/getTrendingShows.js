@@ -1,3 +1,5 @@
+import { persistDiscoveryShows } from "./_persistDiscoveryShows.js";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -74,13 +76,23 @@ export async function handler(event) {
               ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
               : null,
             overview: show.overview || "",
+            first_air_date: show.first_air_date || null,
             year: show.first_air_date ? show.first_air_date.slice(0, 4) : null,
+            vote_average: Number(show.vote_average || 0) || null,
+            vote_count: Number(show.vote_count || 0) || null,
           };
         })
       )
     ).filter((show) => show.tvdb_id);
 
-    return jsonResponse(200, { shows });
+    let persistence = null;
+    try {
+      persistence = await persistDiscoveryShows(shows);
+    } catch (persistError) {
+      console.error("Failed to persist trending shows", persistError);
+    }
+
+    return jsonResponse(200, { shows, persistence });
   } catch (error) {
     return jsonResponse(500, {
       message: error.message || "Failed to load TMDB trending shows",
