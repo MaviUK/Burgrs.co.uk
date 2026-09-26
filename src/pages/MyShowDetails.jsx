@@ -150,6 +150,27 @@ async function fetchBurgrRatings(showId) {
   return data || [];
 }
 
+async function fetchCommunityBurgrStats(showId) {
+  const { data, error } = await supabase
+    .from("show_watched_rating_stats")
+    .select("average_rating, rating_count")
+    .eq("show_id", showId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("community Burgr rating load failed:", error);
+    return { average: null, count: 0 };
+  }
+
+  return {
+    average:
+      data?.average_rating != null && !Number.isNaN(Number(data.average_rating))
+        ? Number(data.average_rating)
+        : null,
+    count: Number(data?.rating_count || 0),
+  };
+}
+
 async function fetchAllEpisodeRatingsForShowEpisodeIds(showEpisodeIds) {
   if (!showEpisodeIds?.length) return [];
 
@@ -225,6 +246,7 @@ function emptyState() {
     savedShowTvdbIds: new Set(),
     burgrRatings: [],
     myBurgrRating: "",
+    communityBurgrStats: { average: null, count: 0 },
     episodeRatings: [],
     savingEpisodeRatingId: null,
     hoverEpisodeRatings: {},
@@ -264,6 +286,10 @@ export default function MyShowDetails() {
 
   const [burgrRatings, setBurgrRatings] = useState([]);
   const [myBurgrRating, setMyBurgrRating] = useState("");
+  const [communityBurgrStats, setCommunityBurgrStats] = useState({
+    average: null,
+    count: 0,
+  });
   const [draftBurgrRating, setDraftBurgrRating] = useState("");
 
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -356,6 +382,7 @@ const burgrTouchRef = useRef({
           setSavedShowTvdbIds(state.savedShowTvdbIds);
           setBurgrRatings(state.burgrRatings);
           setMyBurgrRating(state.myBurgrRating);
+          setCommunityBurgrStats(state.communityBurgrStats);
           setEpisodeRatings(state.episodeRatings);
           setSavingEpisodeRatingId(state.savingEpisodeRatingId);
           setHoverEpisodeRatings(state.hoverEpisodeRatings);
@@ -586,10 +613,12 @@ const burgrTouchRef = useRef({
       try {
         const [
           burgrRows,
+          communityBurgrStatsResult,
           showWatchedRows,
           rankingRowResult,
         ] = await Promise.all([
           fetchBurgrRatings(showId),
+          fetchCommunityBurgrStats(showId),
           fetchWatchedRowsForEpisodeIds(episodeIds, user.id),
           supabase
             .from("user_show_rankings")
@@ -619,6 +648,7 @@ const burgrTouchRef = useRef({
         setWatchedLoaded(true);
         setBurgrRatings(burgrRows || []);
         setMyBurgrRating(mine ? String(mine.rating) : "");
+        setCommunityBurgrStats(communityBurgrStatsResult);
         setEpisodeRatings([]);
         loadedEpisodeRatingSeasonsRef.current.clear();
         setSavingEpisodeRatingId(null);
@@ -1177,8 +1207,12 @@ const burgrTouchRef = useRef({
   }, [targetEpisodeId, show?.id, episodes.length]);
 
   async function refreshBurgrRatings(showId, userId) {
-    const fresh = await fetchBurgrRatings(showId);
+    const [fresh, communityStats] = await Promise.all([
+      fetchBurgrRatings(showId),
+      fetchCommunityBurgrStats(showId),
+    ]);
     setBurgrRatings(fresh);
+    setCommunityBurgrStats(communityStats);
     const mine = (fresh || []).find((row) => row.user_id === userId);
     setMyBurgrRating(mine ? String(mine.rating) : "");
   }
@@ -1793,13 +1827,22 @@ const burgrTouchRef = useRef({
               <div className="msd-stat-box">
                 <span className="msd-stat-label">Watched</span>
                 <strong className="msd-stat-value">
-                  {watchedLoaded ? stats.watched : "..."}
+                  {watchedLoaded ? `${stats.watched} / ${stats.total}` : "..."}
                 </strong>
               </div>
 
-              <div className="msd-stat-box">
-                <span className="msd-stat-label">Total</span>
-                <strong className="msd-stat-value">{stats.total}</strong>
+              <div className="msd-stat-box msd-community-rating-stat">
+                <span className="msd-stat-label">Burgr Avg</span>
+                <strong className="msd-stat-value">
+                  {communityBurgrStats.average != null
+                    ? `${Math.round(communityBurgrStats.average)}%`
+                    : "—"}
+                </strong>
+                {communityBurgrStats.count > 0 ? (
+                  <small className="msd-stat-subvalue">
+                    {communityBurgrStats.count} rated
+                  </small>
+                ) : null}
               </div>
 
               <div className="msd-stat-box">
