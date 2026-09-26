@@ -1936,10 +1936,18 @@ const burgrTouchRef = useRef({
 
                           <div className="msd-watch-grid">
                             {providers.map((provider) => (
-                              <div
-                                key={provider.provider_id}
+                              <Link
+                                key={provider.provider_id || provider.provider_name}
+                                to={`/streaming/${encodeURIComponent(
+                                  provider.provider_id || "provider"
+                                )}?name=${encodeURIComponent(
+                                  provider.provider_name || "Streaming provider"
+                                )}`}
                                 className="msd-watch-card"
-                                title={provider.provider_name}
+                                title={`Browse ${provider.provider_name || "streaming service"}`}
+                                aria-label={`Browse TV shows on ${
+                                  provider.provider_name || "this streaming service"
+                                }`}
                               >
                                 {provider.logo_path ? (
                                   <img
@@ -1950,7 +1958,7 @@ const burgrTouchRef = useRef({
                                 ) : null}
 
                                 <span>{provider.provider_name}</span>
-                              </div>
+                              </Link>
                             ))}
                           </div>
                         </div>
