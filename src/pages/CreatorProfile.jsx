@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import "./CreatorProfile.css";
@@ -155,6 +155,32 @@ function CreatorListCard({
   className = "",
 }) {
   const posterItems = getPosterItems(items);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedItemId, setHighlightedItemId] = useState("");
+  const itemRefs = useRef(new Map());
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const searchMatches = normalizedQuery
+    ? items
+        .filter((item) =>
+          String(item.show_name || "").toLowerCase().includes(normalizedQuery)
+        )
+        .slice(0, 8)
+    : [];
+
+  function selectSearchResult(item) {
+    const itemId = String(item.id);
+    const row = itemRefs.current.get(itemId);
+    setSearchQuery("");
+    setHighlightedItemId(itemId);
+
+    window.setTimeout(() => {
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 20);
+
+    window.setTimeout(() => {
+      setHighlightedItemId((current) => (current === itemId ? "" : current));
+    }, 1800);
+  }
 
   return (
     <article
@@ -207,9 +233,54 @@ function CreatorListCard({
           {description ? <p className="creator-list-description">{description}</p> : null}
 
           {items.length ? (
+            <div className="creator-list-search">
+              <label htmlFor={`creator-list-search-${listId}`}>Find a show in this list</label>
+              <input
+                id={`creator-list-search-${listId}`}
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search this list..."
+                autoComplete="off"
+              />
+              {normalizedQuery ? (
+                <div className="creator-list-search-results">
+                  {searchMatches.length ? (
+                    searchMatches.map((item) => (
+                      <button
+                        key={`search-${item.id}`}
+                        type="button"
+                        className="creator-list-search-result"
+                        onClick={() => selectSearchResult(item)}
+                      >
+                        <strong>#{item.rank}</strong>
+                        <span>
+                          {item.show_name}
+                          {item.show_year ? <small>{item.show_year}</small> : null}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="creator-list-search-empty">No matching shows found</div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {items.length ? (
             <div className="creator-list-items">
               {items.map((item) => (
-                <Link key={item.id} to={showHref(item)} className="creator-list-item">
+                <Link
+                  key={item.id}
+                  ref={(node) => {
+                    const itemId = String(item.id);
+                    if (node) itemRefs.current.set(itemId, node);
+                    else itemRefs.current.delete(itemId);
+                  }}
+                  to={showHref(item)}
+                  className={`creator-list-item${highlightedItemId === String(item.id) ? " is-search-highlight" : ""}`}
+                >
                   <span className="creator-rank">#{item.rank}</span>
                   {item.poster_url ? (
                     <img src={item.poster_url} alt="" loading="lazy" />
