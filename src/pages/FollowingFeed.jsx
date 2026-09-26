@@ -585,6 +585,10 @@ export default function FollowingFeed() {
               video_provider,
               video_embed_url,
               image_url,
+              is_auto_news,
+              source_name,
+              source_url,
+              related_show_id,
               created_at,
               updated_at
             `)
@@ -769,6 +773,18 @@ export default function FollowingFeed() {
                   ) : null}
                   {post.title ? <h2 className="following-post-title">{post.title}</h2> : null}
                   {post.body ? <p className="following-review-text">{post.body}</p> : null}
+                  {post.is_auto_news ? (
+                    <div className="following-news-links">
+                      {post.related_show_id ? (
+                        <Link to={`/show/${post.related_show_id}`}>View show</Link>
+                      ) : null}
+                      {post.source_url ? (
+                        <a href={post.source_url} target="_blank" rel="noreferrer">
+                          Source{post.source_name ? `: ${post.source_name}` : ""}
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <FeedComments
                     inline
                     hideToggle
