@@ -1028,3 +1028,48 @@
   border-color: rgba(151, 7, 71, 0.22);
   background: rgba(255, 255, 255, 0.055);
 }
+
+
+/* Friendly empty states for personal Home sections */
+.dashboard-empty-card {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-height: 70px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.11);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dashboard-empty-card.is-positive {
+  border-color: rgba(151, 7, 71, 0.24);
+  background: rgba(151, 7, 71, 0.06);
+}
+
+.dashboard-empty-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(151, 7, 71, 0.15);
+  color: #ff8abb;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.dashboard-empty-card strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.dashboard-empty-card p {
+  margin: 0;
+  color: #8492a9;
+  font-size: 11px;
+  line-height: 1.35;
+}
