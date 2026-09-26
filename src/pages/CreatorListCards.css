@@ -347,3 +347,125 @@
     font-size: 13px;
   }
 }
+
+
+/* Search inside expanded creator lists. Mirrors the Rank'd find-and-jump flow. */
+.creator-list-search {
+  position: relative;
+  z-index: 6;
+  margin: 0 0 12px;
+}
+
+.creator-list-search label {
+  display: block;
+  margin: 0 0 7px;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.creator-list-search input {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 15px;
+  background: rgba(2, 6, 23, 0.58);
+  color: #f8fafc;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 750;
+  outline: none;
+  padding: 10px 13px;
+}
+
+.creator-list-search input::placeholder {
+  color: #64748b;
+}
+
+.creator-list-search input:focus {
+  border-color: rgba(196, 181, 253, 0.72);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.creator-list-search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  display: grid;
+  gap: 7px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(7, 12, 24, 0.98);
+  padding: 9px;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.42);
+}
+
+.creator-list-search-result {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #f8fafc;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.creator-list-search-result:hover,
+.creator-list-search-result:focus-visible {
+  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(196, 181, 253, 0.34);
+}
+
+.creator-list-search-result > strong {
+  color: #c4b5fd;
+  font-weight: 1000;
+}
+
+.creator-list-search-result > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 850;
+}
+
+.creator-list-search-result small {
+  margin-left: 7px;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.creator-list-search-empty {
+  padding: 12px;
+  color: #94a3b8;
+  font-weight: 800;
+  text-align: center;
+}
+
+.creator-list-card-collapsed .creator-list-item.is-search-highlight {
+  transform: translateY(-1px);
+  background: rgba(190, 24, 93, 0.2);
+  border-color: rgba(244, 114, 182, 0.46);
+  box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.14);
+}
+
+@media (max-width: 760px) {
+  .creator-list-search input {
+    min-height: 40px;
+    font-size: 0.9rem;
+  }
+
+  .creator-list-search-results {
+    max-height: 280px;
+  }
+}
