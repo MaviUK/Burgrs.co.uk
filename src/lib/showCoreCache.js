@@ -149,7 +149,26 @@ export async function fetchShowCoreCached({ source, id, force = false }) {
   coreCache.set(key, request);
 
   try {
-    return await request;
+    const value = await request;
+
+    // A show can be missing on the first lookup and then be inserted moments
+    // later when the user adds it. Never retain that negative lookup in the
+    // in-memory/session cache or the new show will incorrectly stay "not found".
+    if (!value?.show?.id) {
+      coreCache.delete(key);
+
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        try {
+          window.sessionStorage.removeItem(
+            storageKey(normalizedSource, numericId)
+          );
+        } catch {
+          // Best effort only.
+        }
+      }
+    }
+
+    return value;
   } catch (error) {
     coreCache.delete(key);
     throw error;
