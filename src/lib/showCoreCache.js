@@ -35,7 +35,15 @@ function readStoredCore(source, id) {
       return null;
     }
 
-    return parsed.value || null;
+    // Older builds could persist a negative lookup. Treat any cached value
+    // without a real show row as invalid so stale "Show not found" results
+    // cannot survive a deployment or a later database insert.
+    if (!parsed?.value?.show?.id) {
+      window.sessionStorage.removeItem(storageKey(source, id));
+      return null;
+    }
+
+    return parsed.value;
   } catch {
     return null;
   }
