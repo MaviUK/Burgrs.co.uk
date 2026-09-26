@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v18_EDITORIAL_NEWS";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v19_EMPTY_STATES";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -1216,31 +1216,52 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
+      ) : dashboardView.isSignedIn && !upNext ? (
+        <section className="dashboard-personal-section dashboard-continue-section">
+          <SectionHeader title="Catch Up" to="/my-shows" />
+          <div className="dashboard-empty-card is-positive">
+            <span className="dashboard-empty-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>You’re all caught up</strong>
+              <p>No aired episodes are waiting for you.</p>
+            </div>
+          </div>
+        </section>
       ) : null}
 
-      {dashboardView.isSignedIn && upcomingGroups.length > 0 ? (
+      {dashboardView.isSignedIn ? (
         <section className="dashboard-personal-section dashboard-this-week-section">
           <SectionHeader title="Upcoming This Week" to="/calendar" linkLabel="Calendar" />
-          <div className="dashboard-week-groups">
-            {upcomingGroups.map((group) => (
-              <div
-                key={group.key}
-                className={`dashboard-day-group${group.isToday ? " is-today" : ""}`}
-              >
-                <h3>{group.isToday ? "NEW TODAY" : group.label}</h3>
-                <div className="dashboard-list dashboard-upcoming-list">
-                  {group.items.map(({ show, episode, episodes }) => (
-                    <DashboardEpisodeItem
-                      key={`${show.show_id}-${group.key}-week`}
-                      show={show}
-                      episode={episode}
-                      episodes={episodes}
-                    />
-                  ))}
+          {upcomingGroups.length > 0 ? (
+            <div className="dashboard-week-groups">
+              {upcomingGroups.map((group) => (
+                <div
+                  key={group.key}
+                  className={`dashboard-day-group${group.isToday ? " is-today" : ""}`}
+                >
+                  <h3>{group.isToday ? "NEW TODAY" : group.label}</h3>
+                  <div className="dashboard-list dashboard-upcoming-list">
+                    {group.items.map(({ show, episode, episodes }) => (
+                      <DashboardEpisodeItem
+                        key={`${show.show_id}-${group.key}-week`}
+                        show={show}
+                        episode={episode}
+                        episodes={episodes}
+                      />
+                    ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="dashboard-empty-card">
+              <span className="dashboard-empty-icon" aria-hidden="true">◷</span>
+              <div>
+                <strong>Nothing coming up this week</strong>
+                <p>No new episodes from shows you’re caught up on are scheduled this week.</p>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </section>
       ) : null}
 
