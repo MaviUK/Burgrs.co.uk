@@ -1212,31 +1212,59 @@ export default function CreatorProfile() {
             {posts.length ? (
               <div className="creator-post-list">
                 {posts.map((post) => (
-                  <article key={post.id} className="creator-post-card">
+                  <article
+                    key={post.id}
+                    className={`creator-post-card${post.is_auto_news ? " creator-post-card-news" : ""}`}
+                  >
                     <div className="creator-post-meta">
-                      <span>{formatPostType(post.post_type)}</span>
+                      <span>{post.is_auto_news ? "TV News" : formatPostType(post.post_type)}</span>
                       <span>{formatDate(post.created_at)}</span>
                       {post.visibility === "subscribers" ? <span>Subscribers only</span> : null}
                     </div>
 
-                    <VideoEmbed post={post} />
-
-                    {!post.video_embed_url && post.image_url ? (
-                      <img src={post.image_url} alt="" className="creator-post-image" />
-                    ) : null}
-
-                    {post.title ? <h3>{post.title}</h3> : null}
-                    {post.body ? <p>{post.body}</p> : null}
                     {post.is_auto_news ? (
-                      <div className="creator-news-links">
-                        {post.related_show_id ? <Link to={`/show/${post.related_show_id}`}>View show</Link> : null}
-                        {post.source_url ? (
-                          <a href={post.source_url} target="_blank" rel="noreferrer">
-                            Source{post.source_name ? `: ${post.source_name}` : ""}
-                          </a>
+                      <div className={`creator-news-story${post.image_url ? "" : " no-image"}`}>
+                        {post.image_url ? (
+                          post.related_show_id ? (
+                            <Link to={`/show/${post.related_show_id}`} className="creator-news-poster-link">
+                              <img src={post.image_url} alt="" className="creator-news-poster" />
+                            </Link>
+                          ) : (
+                            <img src={post.image_url} alt="" className="creator-news-poster" />
+                          )
                         ) : null}
+                        <div className="creator-news-copy">
+                          {post.source_name ? <span className="creator-news-source">{post.source_name}</span> : null}
+                          {post.title ? <h3>{post.title}</h3> : null}
+                          <div className="creator-news-actions">
+                            {post.related_show_id ? (
+                              <Link to={`/show/${post.related_show_id}`} className="creator-news-action creator-news-action-primary">
+                                View show
+                              </Link>
+                            ) : null}
+                            {post.source_url ? (
+                              <a
+                                href={post.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="creator-news-action"
+                              >
+                                Read source
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                    ) : null}
+                    ) : (
+                      <>
+                        <VideoEmbed post={post} />
+                        {!post.video_embed_url && post.image_url ? (
+                          <img src={post.image_url} alt="" className="creator-post-image" />
+                        ) : null}
+                        {post.title ? <h3>{post.title}</h3> : null}
+                        {post.body ? <p>{post.body}</p> : null}
+                      </>
+                    )}
 
                     {isOwnProfile ? (
                       <button
