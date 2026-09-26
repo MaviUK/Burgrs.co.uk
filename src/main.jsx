@@ -143,7 +143,6 @@ function loadDeferredEnhancements() {
     import('./show-page-polish.js'),
     import('./show-trailer-thumbnail.js'),
     import('./show-prefetch.js'),
-    import('./specials-collapse.js'),
     import('./show-data-attribution.js'),
     import('./public-show-review-access.js'),
     import('./creator-profile-chats.js'),
