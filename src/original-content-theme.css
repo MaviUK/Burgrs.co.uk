@@ -839,3 +839,8 @@ textarea:focus-visible,
   border-color: #970747 !important;
   opacity: 0.45 !important;
 }
+
+
+.msd-page .msd-community-rating-stat .msd-stat-value {
+  color: var(--burgr-average-color, #f8fafc) !important;
+}
