@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v13_BATCH_RELEASES";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v14_SMART_UP_NEXT";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -55,6 +55,7 @@ function makeEmptyDashboardView() {
       inProgressCount: 0,
       completedCount: 0,
       watchedMinutes: 0,
+      upNext: null,
       continueWatching: [],
       airingThisWeek: [],
       recentlyAdded: [],
@@ -543,6 +544,12 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     }
   });
 
+  const todayKey = [
+    new Date().getFullYear(),
+    String(new Date().getMonth() + 1).padStart(2, "0"),
+    String(new Date().getDate()).padStart(2, "0"),
+  ].join("-");
+
   const progressByShow = new Map(
     visibleShows.map((show) => {
       const showKey = String(show.show_id);
@@ -569,7 +576,16 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       const unwatchedFromCurrentPosition = relevantAiredEpisodes.filter(
         (episode) => !watchedIds.has(String(episode.id))
       );
-      const nextEpisode = unwatchedFromCurrentPosition[0] || null;
+      const olderUnwatched = unwatchedFromCurrentPosition.filter(
+        (episode) => normalizeDateOnly(episode.aired) < todayKey
+      );
+      const releasedToday = unwatchedFromCurrentPosition.filter(
+        (episode) => normalizeDateOnly(episode.aired) === todayKey
+      );
+      const isNewToday = releasedToday.length > 0 && olderUnwatched.length === 0;
+      const nextEpisode = isNewToday
+        ? releasedToday[0]
+        : unwatchedFromCurrentPosition[0] || null;
 
       return [
         showKey,
@@ -577,6 +593,7 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
           show,
           episode: nextEpisode,
           episodesBehind: unwatchedFromCurrentPosition.length,
+          isNewToday,
           watchedCount,
           totalAired: airedEpisodes.length,
           lastWatchedAt: latestWatchedAtByShow.get(showKey) || 0,
@@ -588,7 +605,7 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     })
   );
 
-  const continueWatching = visibleShows
+  const catchUpCandidates = visibleShows
     .filter((show) => normalizeStatus(show.watch_status) === "watching")
     .map((show) => progressByShow.get(String(show.show_id)))
     .filter((item) => item?.episode && item.episodesBehind > 0)
@@ -596,7 +613,24 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       if (b.lastWatchedAt !== a.lastWatchedAt) return b.lastWatchedAt - a.lastWatchedAt;
       if (a.episodesBehind !== b.episodesBehind) return a.episodesBehind - b.episodesBehind;
       return b.progress - a.progress;
-    })
+    });
+
+  const newTodayCandidates = catchUpCandidates
+    .filter((item) => item.isNewToday)
+    .sort((a, b) => {
+      if (b.lastWatchedAt !== a.lastWatchedAt) return b.lastWatchedAt - a.lastWatchedAt;
+      if (a.episodesBehind !== b.episodesBehind) return a.episodesBehind - b.episodesBehind;
+      return String(a.show?.show_name || "").localeCompare(String(b.show?.show_name || ""));
+    });
+
+  // A new episode released today from a show that was caught up yesterday wins.
+  // Otherwise continue the show the user watched most recently.
+  const upNext = newTodayCandidates[0] || catchUpCandidates[0] || null;
+  const continueWatching = catchUpCandidates
+    .filter(
+      (item) =>
+        !upNext || String(item.show?.show_id || "") !== String(upNext.show?.show_id || "")
+    )
     .slice(0, 8);
 
   const caughtUpShowIds = new Set(
@@ -644,6 +678,7 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       (show) => normalizeStatus(show.watch_status) === "completed"
     ).length,
     watchedMinutes,
+    upNext,
     continueWatching,
     airingThisWeek,
     recentlyAdded,
@@ -765,7 +800,7 @@ function ExternalShowCard({ show, savedShows, databaseShows, showPremiereDate = 
 function UpNextHero({ item }) {
   if (!item) return null;
 
-  const { show, episode, watchedCount, totalAired, progress } = item;
+  const { show, episode, watchedCount, totalAired, progress, isNewToday } = item;
   const backgroundImage = show.backdrop_url || show.poster_url || "";
 
   return (
@@ -776,7 +811,9 @@ function UpNextHero({ item }) {
     >
       <div className="up-next-shade" />
       <div className="up-next-content">
-        <span className="up-next-kicker">Up Next</span>
+        <span className="up-next-kicker">
+          Up Next{isNewToday ? " · New today" : ""}
+        </span>
         <h1>{show.show_name || "Unknown show"}</h1>
         <p>
           <strong>{getDisplayEpisodeCode(episode)}</strong>
@@ -1024,8 +1061,10 @@ export default function Dashboard() {
   const newsStories = dashboardView.newsStories || [];
   const friendPicks = dashboardView.friendPicks || [];
   const data = dashboardView.stats || makeEmptyDashboardView().stats;
-  const upNext = data.continueWatching?.[0] || null;
-  const continueWatching = (data.continueWatching || []).slice(1);
+  const upNext = data.upNext || data.continueWatching?.[0] || null;
+  const continueWatching = data.upNext
+    ? data.continueWatching || []
+    : (data.continueWatching || []).slice(1);
   const upcomingGroups = groupUpcomingByDay(data.airingThisWeek || []);
 
   if (loading) {
