@@ -49,13 +49,20 @@ function StreamingShowCard({ show }) {
 
   const content = (
     <>
-      <ProviderPoster show={show} />
+      <div className="streaming-show-poster-wrap">
+        <ProviderPoster show={show} />
+        {rating > 0 ? (
+          <span
+            className="streaming-show-rating-badge"
+            aria-label={`TMDB rating ${rating.toFixed(1)} out of 10`}
+          >
+            ★ {rating.toFixed(1)}
+          </span>
+        ) : null}
+      </div>
       <div className="streaming-show-copy">
         <strong>{show?.name || "Unknown show"}</strong>
-        <div className="streaming-show-meta">
-          {year ? <span>{year}</span> : null}
-          {rating > 0 ? <span>{rating.toFixed(1)}</span> : null}
-        </div>
+        {year ? <span className="streaming-show-year">{year}</span> : null}
       </div>
     </>
   );
