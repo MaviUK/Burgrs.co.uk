@@ -98,7 +98,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #c4b5fd;
+  color: #f9a8d4;
   font-size: 11px;
   font-weight: 950;
   text-transform: uppercase;
@@ -384,8 +384,8 @@
 }
 
 .creator-list-search input:focus {
-  border-color: rgba(196, 181, 253, 0.72);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+  border-color: rgba(190, 24, 93, 0.88);
+  box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.2);
 }
 
 .creator-list-search-results {
@@ -422,7 +422,7 @@
 .creator-list-search-result:hover,
 .creator-list-search-result:focus-visible {
   background: rgba(255, 255, 255, 0.075);
-  border-color: rgba(196, 181, 253, 0.34);
+  border-color: rgba(244, 114, 182, 0.34);
 }
 
 .creator-list-search-result > strong {
