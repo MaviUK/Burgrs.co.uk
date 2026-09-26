@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v15_CATCH_UP_CARDS";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v16_UPCOMING_PROVIDERS";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -208,6 +208,89 @@ function getSavedShowLink(show) {
   if (show.tvdb_id) return `/my-shows/${show.tvdb_id}`;
   if (show.tmdb_id) return `/my-shows/tmdb/${show.tmdb_id}`;
   return "/my-shows";
+}
+
+const upcomingProviderCache = new Map();
+
+function providerLogoUrl(provider) {
+  if (provider?.logo_path) {
+    return `https://image.tmdb.org/t/p/w92${provider.logo_path}`;
+  }
+  return provider?.absolute_logo_url || "";
+}
+
+async function fetchUpcomingProviders(tmdbId) {
+  const key = String(tmdbId || "");
+  if (!key) return [];
+  if (upcomingProviderCache.has(key)) return upcomingProviderCache.get(key);
+
+  const request = fetch(
+    `/.netlify/functions/getTmdbWatchProviders?tmdbId=${encodeURIComponent(key)}&country=GB`
+  )
+    .then(async (response) => {
+      if (!response.ok) return [];
+      const payload = await response.json();
+      const providers = Array.isArray(payload?.flatrate) ? payload.flatrate : [];
+      const seen = new Set();
+      return providers
+        .filter((provider) => {
+          const providerKey = String(provider?.provider_id || provider?.provider_name || "");
+          if (!providerKey || seen.has(providerKey)) return false;
+          seen.add(providerKey);
+          return true;
+        })
+        .slice(0, 2);
+    })
+    .catch(() => []);
+
+  upcomingProviderCache.set(key, request);
+  const providers = await request;
+  upcomingProviderCache.set(key, providers);
+  return providers;
+}
+
+function UpcomingProviderBadge({ show }) {
+  const [providers, setProviders] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!show?.tmdb_id) {
+      setProviders([]);
+      return () => {
+        active = false;
+      };
+    }
+
+    fetchUpcomingProviders(show.tmdb_id).then((items) => {
+      if (active) setProviders(items || []);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [show?.tmdb_id]);
+
+  if (!providers.length) return null;
+
+  return (
+    <span className="upcoming-provider-row" aria-label="Where to watch">
+      <span className="upcoming-provider-prefix">Watch</span>
+      {providers.map((provider) => {
+        const name = provider?.provider_name || "Streaming service";
+        const logo = providerLogoUrl(provider);
+        return (
+          <span
+            className="upcoming-provider"
+            key={provider?.provider_id || name}
+            title={name}
+          >
+            {logo ? <img src={logo} alt="" loading="lazy" /> : null}
+            <span>{name}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 function chunkArray(items, size) {
@@ -766,6 +849,7 @@ function DashboardEpisodeItem({ show, episode, episodes = [] }) {
         <small>
           {isBatchRelease ? "Releases" : "Airs"} {formatDate(firstEpisode.aired)}
         </small>
+        <UpcomingProviderBadge show={show} />
       </div>
       <span className="dashboard-list-chevron" aria-hidden="true">›</span>
     </Link>
