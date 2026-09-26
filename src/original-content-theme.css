@@ -341,9 +341,18 @@ main a:not(.top-tab):not(.mobile-nav-item) {
 
 .following-page .following-creator-line,
 .following-page .following-avatar-link,
-.following-page .following-creator-name-link,
-.following-page .following-creator-meta-row .feed-comments-inline-toggle {
+.following-page .following-creator-name-link {
   color: #c4b5fd !important;
+}
+
+.following-page .following-creator-meta-row .feed-comments-inline-toggle {
+  color: #cbd5e1 !important;
+}
+
+.following-page .following-creator-meta-row .feed-comments-inline-toggle:hover,
+.following-page .following-creator-meta-row .feed-comments-inline-toggle:focus-visible,
+.following-page .following-creator-meta-row .feed-comments-inline-toggle[aria-expanded="true"] {
+  color: #f472b6 !important;
 }
 
 .following-page .following-avatar,
