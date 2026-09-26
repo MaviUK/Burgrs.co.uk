@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v18_EDITORIAL_NEWS";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v19_HOME_MARK_WATCHED";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -805,28 +805,38 @@ function Poster({ src, alt, className }) {
   return <img src={src} alt={alt || ""} className={className} loading="lazy" decoding="async" />;
 }
 
-function ContinueWatchingCard({ item }) {
+function ContinueWatchingCard({ item, onMarkWatched, marking = false }) {
   const { show, episode, watchedCount, totalAired, progress, episodesBehind } = item;
   const behindLabel = episodesBehind
     ? `${episodesBehind} episode${episodesBehind === 1 ? "" : "s"} behind`
     : `${watchedCount} of ${totalAired} aired episodes watched`;
 
   return (
-    <Link to={getSavedShowLink(show)} className="continue-card">
-      <Poster src={show.poster_url} alt={show.show_name} className="continue-card-poster" />
-      <div className="continue-card-copy">
-        <div className="continue-card-heading">
-          <strong>{show.show_name || "Unknown show"}</strong>
-          {episodesBehind ? <span className="catch-up-count">{behindLabel}</span> : null}
+    <div className="continue-card-shell">
+      <Link to={getSavedShowLink(show)} className="continue-card">
+        <Poster src={show.poster_url} alt={show.show_name} className="continue-card-poster" />
+        <div className="continue-card-copy">
+          <div className="continue-card-heading">
+            <strong>{show.show_name || "Unknown show"}</strong>
+            {episodesBehind ? <span className="catch-up-count">{behindLabel}</span> : null}
+          </div>
+          <span className="catch-up-next-label">Next · {getDisplayEpisodeCode(episode)}</span>
+          <span className="catch-up-episode-title">{getEpisodeDisplayName(episode)}</span>
+          <div className="continue-progress" aria-label={`${progress}% watched`}>
+            <span style={{ width: `${Math.max(3, progress)}%` }} />
+          </div>
+          {!episodesBehind ? <small>{behindLabel}</small> : null}
         </div>
-        <span className="catch-up-next-label">Next · {getDisplayEpisodeCode(episode)}</span>
-        <span className="catch-up-episode-title">{getEpisodeDisplayName(episode)}</span>
-        <div className="continue-progress" aria-label={`${progress}% watched`}>
-          <span style={{ width: `${Math.max(3, progress)}%` }} />
-        </div>
-        {!episodesBehind ? <small>{behindLabel}</small> : null}
-      </div>
-    </Link>
+      </Link>
+      <button
+        type="button"
+        className="catch-up-watch-button"
+        onClick={() => onMarkWatched?.(item)}
+        disabled={marking}
+      >
+        {marking ? "Saving..." : "✓ Mark watched"}
+      </button>
+    </div>
   );
 }
 
@@ -901,15 +911,14 @@ function ExternalShowCard({ show, savedShows, databaseShows, showPremiereDate = 
   return <Link to={linkTarget} className="trending-card">{content}</Link>;
 }
 
-function UpNextHero({ item }) {
+function UpNextHero({ item, onMarkWatched, marking = false }) {
   if (!item) return null;
 
   const { show, episode, watchedCount, totalAired, progress, isNewToday } = item;
   const backgroundImage = show.backdrop_url || show.poster_url || "";
 
   return (
-    <Link
-      to={getSavedShowLink(show)}
+    <div
       className="up-next-hero"
       style={backgroundImage ? { backgroundImage: `url("${backgroundImage}")` } : undefined}
     >
@@ -927,9 +936,21 @@ function UpNextHero({ item }) {
           <span style={{ width: `${Math.max(3, progress)}%` }} />
         </div>
         <small>{watchedCount} of {totalAired} aired episodes watched</small>
-        <span className="up-next-action">View episode <b aria-hidden="true">›</b></span>
+        <div className="up-next-actions">
+          <Link to={getSavedShowLink(show)} className="up-next-action">
+            View episode <b aria-hidden="true">›</b>
+          </Link>
+          <button
+            type="button"
+            className="up-next-watch-action"
+            onClick={() => onMarkWatched?.(item)}
+            disabled={marking}
+          >
+            {marking ? "Saving..." : "✓ Mark watched"}
+          </button>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -1018,6 +1039,7 @@ function StatCard({ label, value, to = null }) {
 export default function Dashboard() {
   const [dashboardView, setDashboardView] = useState(() => makeEmptyDashboardView());
   const [loading, setLoading] = useState(true);
+  const [markingEpisodeIds, setMarkingEpisodeIds] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -1167,6 +1189,69 @@ export default function Dashboard() {
     };
   }, []);
 
+  async function handleMarkWatched(item) {
+    const episodeId = item?.episode?.id;
+    if (!episodeId || markingEpisodeIds[String(episodeId)]) return;
+
+    setMarkingEpisodeIds((current) => ({
+      ...current,
+      [String(episodeId)]: true,
+    }));
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) throw new Error("You need to be signed in.");
+
+      const { error: watchedError } = await supabase
+        .from("watched_episodes")
+        .upsert(
+          {
+            user_id: user.id,
+            episode_id: episodeId,
+            watched_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,episode_id" }
+        );
+
+      if (watchedError) throw watchedError;
+
+      const currentShows = dashboardView.savedShows || [];
+      const showIds = currentShows
+        .filter((show) => !isArchivedStatus(show.watch_status))
+        .map((show) => show.show_id)
+        .filter(Boolean);
+
+      const [watchedRows, allEpisodes] = await Promise.all([
+        showIds.length
+          ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
+          : Promise.resolve([]),
+        showIds.length ? fetchEpisodesForShowIds(showIds) : Promise.resolve([]),
+      ]);
+
+      const refreshedView = {
+        ...dashboardView,
+        stats: buildPersonalDashboard(currentShows, allEpisodes, watchedRows),
+      };
+
+      setDashboardView(refreshedView);
+      writeDashboardCache(user.id, refreshedView);
+    } catch (error) {
+      console.error("Failed marking episode watched from Home:", error);
+      alert(error?.message || "Failed to mark episode watched.");
+    } finally {
+      setMarkingEpisodeIds((current) => {
+        const next = { ...current };
+        delete next[String(episodeId)];
+        return next;
+      });
+    }
+  }
+
   const savedShows = dashboardView.savedShows || [];
   const databaseShows = dashboardView.databaseShows || [];
   const trendingShows = dashboardView.trendingShows || [];
@@ -1203,7 +1288,11 @@ export default function Dashboard() {
 
       {dashboardView.isSignedIn && upNext ? (
         <section className="dashboard-personal-section dashboard-up-next-section">
-          <UpNextHero item={upNext} />
+          <UpNextHero
+            item={upNext}
+            onMarkWatched={handleMarkWatched}
+            marking={Boolean(markingEpisodeIds[String(upNext.episode?.id || "")])}
+          />
         </section>
       ) : null}
 
@@ -1212,7 +1301,12 @@ export default function Dashboard() {
           <SectionHeader title="Catch Up" to="/my-shows" />
           <div className="continue-row">
             {continueWatching.map((item) => (
-              <ContinueWatchingCard key={`continue-${item.show.show_id}`} item={item} />
+              <ContinueWatchingCard
+                key={`continue-${item.show.show_id}`}
+                item={item}
+                onMarkWatched={handleMarkWatched}
+                marking={Boolean(markingEpisodeIds[String(item.episode?.id || "")])}
+              />
             ))}
           </div>
         </section>
