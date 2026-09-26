@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { saveShowToDatabaseComplete } from "./saveShowToDatabaseComplete";
+import { clearShowCoreCache } from "./showCoreCache";
 
 const MY_SHOWS_CACHE_PREFIX = "trackt_my_shows_cache_v1";
 const MY_SHOWS_LAST_CACHE_KEY = `${MY_SHOWS_CACHE_PREFIX}:last`;
@@ -108,10 +109,23 @@ export async function addShowToUserList(show) {
     throw new Error("Failed to save show to database.");
   }
 
+  const savedTvdbId = getResolvedTvdbId(savedShow) || tvdbId;
+  const savedTmdbId = getResolvedTmdbId(savedShow) || tmdbId;
+
+  // The details page may have cached a negative lookup before this show existed
+  // locally. Clear both possible route keys immediately after the save.
+  if (savedTvdbId) {
+    clearShowCoreCache({ source: "tvdb", id: savedTvdbId });
+  }
+  if (savedTmdbId) {
+    clearShowCoreCache({ source: "tmdb", id: savedTmdbId });
+  }
+
   const upsertPayload = {
     user_id: user.id,
     show_id: savedShow.id,
     watch_status: "watchlist",
+    tmdb_id: savedTmdbId,
   };
 
   const { error } = await supabase.from("user_shows_new").upsert(upsertPayload, {
