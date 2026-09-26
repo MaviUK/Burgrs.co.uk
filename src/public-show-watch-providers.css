@@ -50,6 +50,20 @@
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   color: #e2e8f0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.public-watch-provider-card:active {
+  transform: scale(0.98);
+}
+
+.public-watch-provider-card:hover,
+.public-watch-provider-card:focus-visible {
+  border-color: rgba(180, 0, 78, 0.72);
+  background: rgba(180, 0, 78, 0.08);
+  outline: none;
 }
 
 .public-watch-provider-card span {
