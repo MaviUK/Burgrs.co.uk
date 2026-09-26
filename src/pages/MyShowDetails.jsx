@@ -793,6 +793,7 @@ const burgrTouchRef = useRef({
         if (!isCancelled) {
           setBurgrRatings([]);
           setMyBurgrRating("");
+          setCommunityBurgrStats({ average: null, count: 0 });
           setEpisodeRatings([]);
           setCast([]);
           setCrew([]);
@@ -864,6 +865,7 @@ const burgrTouchRef = useRef({
           setSavedShowTvdbIds(new Set());
           setBurgrRatings([]);
           setMyBurgrRating("");
+          setCommunityBurgrStats({ average: null, count: 0 });
           setEpisodeRatings([]);
           setSavingEpisodeRatingId(null);
           setHoverEpisodeRatings({});
@@ -890,6 +892,7 @@ const burgrTouchRef = useRef({
           setSavedShowTvdbIds(new Set());
           setBurgrRatings([]);
           setMyBurgrRating("");
+          setCommunityBurgrStats({ average: null, count: 0 });
           setEpisodeRatings([]);
           setSavingEpisodeRatingId(null);
           setHoverEpisodeRatings({});
