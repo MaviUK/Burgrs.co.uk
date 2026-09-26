@@ -110,6 +110,8 @@ export default function StreamingProvider() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const requestSerial = useRef(0);
+  const loadMoreSentinelRef = useRef(null);
+  const loadMoreInFlightRef = useRef(false);
 
   const endpointBase = useMemo(() => {
     const params = new URLSearchParams();
@@ -130,6 +132,7 @@ export default function StreamingProvider() {
       setError("");
       setShows([]);
       setPage(1);
+      loadMoreInFlightRef.current = false;
 
       try {
         const params = new URLSearchParams(endpointBase);
@@ -172,8 +175,15 @@ export default function StreamingProvider() {
   }, [endpointBase, sort, genre]);
 
   async function loadMore() {
-    if (loadingMore || page >= totalPages) return;
+    if (
+      loadingMore ||
+      loadMoreInFlightRef.current ||
+      page >= totalPages
+    ) {
+      return;
+    }
 
+    loadMoreInFlightRef.current = true;
     const nextPage = page + 1;
     setLoadingMore(true);
     setError("");
@@ -209,9 +219,41 @@ export default function StreamingProvider() {
     } catch (loadError) {
       setError(loadError?.message || "Could not load more shows.");
     } finally {
+      loadMoreInFlightRef.current = false;
       setLoadingMore(false);
     }
   }
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+
+    if (
+      !sentinel ||
+      loading ||
+      loadingMore ||
+      error ||
+      page >= totalPages
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "600px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [loading, loadingMore, error, page, totalPages, endpointBase, sort, genre]);
 
   const headingName = provider?.name || providerNameHint || "Streaming service";
 
@@ -299,15 +341,22 @@ export default function StreamingProvider() {
 
           {error ? <p className="streaming-provider-inline-error">{error}</p> : null}
 
-          {page < totalPages ? (
-            <button
-              type="button"
-              className="streaming-load-more"
-              onClick={loadMore}
-              disabled={loadingMore}
+          {page < totalPages && !error ? (
+            <div
+              ref={loadMoreSentinelRef}
+              className="streaming-auto-loader"
+              aria-live="polite"
+              aria-busy={loadingMore}
             >
-              {loadingMore ? "Loading..." : "Load more shows"}
-            </button>
+              {loadingMore ? (
+                <>
+                  <span className="streaming-auto-loader-spinner" aria-hidden="true" />
+                  <span>Loading more shows...</span>
+                </>
+              ) : (
+                <span className="streaming-auto-loader-sentinel" aria-hidden="true" />
+              )}
+            </div>
           ) : null}
         </>
       ) : null}
