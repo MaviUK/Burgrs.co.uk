@@ -299,15 +299,25 @@ async function getOptionalUser() {
 }
 
 async function fetchRankdShowPage(userId, from, to) {
-  const { data, error } = await supabase
-    .from("user_shows_new")
-    .select("show_id, watch_status, shows!inner(id, tvdb_id, name, poster_url)")
-    .eq("user_id", userId)
-    .in("watch_status", ["completed", "watching"])
-    .range(from, to);
+  if (!userId) return [];
+
+  const { data, error } = await supabase.rpc("get_rankd_eligible_shows", {
+    p_offset: from,
+    p_limit: Math.max(1, to - from + 1),
+  });
 
   if (error) throw error;
-  return data || [];
+
+  return (data || []).map((row) => ({
+    show_id: row.show_id,
+    watch_status: row.watch_status,
+    shows: {
+      id: row.id,
+      tvdb_id: row.tvdb_id,
+      name: row.name,
+      poster_url: row.poster_url,
+    },
+  }));
 }
 
 async function fetchRankingMap(userId, showIds) {
