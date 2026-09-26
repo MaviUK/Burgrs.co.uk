@@ -299,17 +299,22 @@ async function handleGuestSharedVote(event) {
       }, {});
 
     const guestToken = getOrCreateGuestToken();
-    const { data: voteResult, error } = await supabase.rpc(
-      "rankd_record_guest_matchup_vote",
+    const { data: voteResult, error } = await supabase.functions.invoke(
+      "rankd-guest-vote",
       {
-        p_share_slug: matchup.share_slug,
-        p_guest_token: guestToken,
-        p_winner_show_id: String(winner.id),
-        p_loser_show_id: String(loser.id),
+        body: {
+          share_slug: matchup.share_slug,
+          guest_token: guestToken,
+          winner_show_id: String(winner.id),
+          loser_show_id: String(loser.id),
+        },
       }
     );
 
     if (error) throw error;
+    if (voteResult?.rate_limited) {
+      throw new Error(voteResult?.message || "Too many guest votes. Try again later.");
+    }
     if (!voteResult?.recorded && !voteResult?.duplicate) {
       throw new Error("Guest vote was not recorded.");
     }
