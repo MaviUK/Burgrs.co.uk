@@ -29,7 +29,8 @@ const MyShowDetails = lazy(() => import("./pages/MyShowDetails"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const ActorPage = lazy(() => import("./pages/ActorPage"));
-const Rankd = lazy(() => import("./pages/Rankd"));\nconst StreamingProvider = lazy(() => import("./pages/StreamingProvider"));
+const Rankd = lazy(() => import("./pages/Rankd"));
+const StreamingProvider = lazy(() => import("./pages/StreamingProvider"));
 
 const HEADER_PROFILE_CACHE_PREFIX = "burgrs-header-profile:";
 
@@ -165,7 +166,8 @@ function isPublicSharedPage(pathname) {
   return (
     pathname.startsWith("/rankd/share/") ||
     pathname.startsWith("/u/") ||
-    pathname.startsWith("/show/") ||\n    pathname.startsWith("/streaming/")
+    pathname.startsWith("/show/") ||
+    pathname.startsWith("/streaming/")
   );
 }
 
@@ -514,7 +516,8 @@ function AppLayout() {
           <Route path="/creator/posts/new" element={<ProtectedRoute session={session}><CreatorPostEditor /></ProtectedRoute>} />
           <Route path="/search" element={<ProtectedRoute session={session}><Search /></ProtectedRoute>} />
           <Route path="/show/:id" element={<ShowDetails />} />
-          <Route path="/show/tmdb/:tmdbId" element={<ShowDetails />} />\n          <Route path="/streaming/:providerId" element={<StreamingProvider />} />
+          <Route path="/show/tmdb/:tmdbId" element={<ShowDetails />} />
+          <Route path="/streaming/:providerId" element={<StreamingProvider />} />
           <Route path="/my-shows" element={<ProtectedRoute session={session}><MyShows /></ProtectedRoute>} />
           <Route path="/my-shows/:id" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
           <Route path="/my-shows/tmdb/:tmdbId" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
