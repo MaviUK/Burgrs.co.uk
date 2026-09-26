@@ -364,50 +364,6 @@ function createQuickSpotlight(route, context) {
   statsRow.insertAdjacentElement("afterend", card);
 }
 
-function createSpecialsPanel(context) {
-  const seasonsPanel = document.querySelector(".msd-tab-panel");
-  if (!seasonsPanel || document.querySelector(".burgr-specials-panel")) return;
-
-  const specials = context.episodes.filter(
-    (episode) => Number(episode.seasonNumber) === 0
-  );
-  if (!specials.length) return;
-
-  const seasonsContainer = seasonsPanel.querySelector(".msd-seasons");
-  if (!seasonsContainer) return;
-
-  const panel = document.createElement("section");
-  panel.className = "msd-season-card burgr-specials-panel";
-
-  const title = document.createElement("div");
-  title.className = "msd-season-title";
-  title.textContent = "Specials";
-  panel.appendChild(title);
-
-  const subtitle = document.createElement("div");
-  subtitle.className = "msd-season-subtitle";
-  subtitle.textContent = `${specials.length} special${specials.length === 1 ? "" : "s"}`;
-  panel.appendChild(subtitle);
-
-  const list = document.createElement("div");
-  list.className = "burgr-specials-list";
-  specials.slice(0, 16).forEach((episode) => {
-    const row = document.createElement("div");
-    row.className = "burgr-special-row";
-    const name = document.createElement("strong");
-    name.textContent = `${episodeCode(episode)} · ${episode.name}`;
-    row.appendChild(name);
-    if (episode.aired) {
-      const date = document.createElement("span");
-      date.textContent = formatDate(episode.aired);
-      row.appendChild(date);
-    }
-    list.appendChild(row);
-  });
-  panel.appendChild(list);
-  seasonsContainer.appendChild(panel);
-}
-
 function addSectionLabels() {
   document.querySelectorAll(".msd-panel .msd-section-title").forEach((heading) => {
     const text = heading.textContent?.trim().toLowerCase() || "";
@@ -434,7 +390,6 @@ async function enhanceShowPage() {
     if (getShowRoute()?.key !== route.key) return;
 
     createQuickSpotlight(route, context);
-    createSpecialsPanel(context);
     addSectionLabels();
   } catch (error) {
     console.warn("Show page polish failed", error);
