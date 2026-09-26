@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import FeedComments from "../components/FeedComments";
 import { supabase } from "../lib/supabase";
@@ -193,6 +193,32 @@ function FollowingListCard({ list, isExpanded, onToggle }) {
   const badge = list.is_auto_top_list ? "Rank'd" : formatDate(list.created_at);
   const title = list.title || "Untitled list";
   const subtitle = getListSubtitle(list);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedItemId, setHighlightedItemId] = useState("");
+  const itemRefs = useRef(new Map());
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const searchMatches = normalizedQuery
+    ? (list.items || [])
+        .filter((item) =>
+          String(item.show_name || "").toLowerCase().includes(normalizedQuery)
+        )
+        .slice(0, 8)
+    : [];
+
+  function selectSearchResult(item) {
+    const itemId = String(item.id);
+    const row = itemRefs.current.get(itemId);
+    setSearchQuery("");
+    setHighlightedItemId(itemId);
+
+    window.setTimeout(() => {
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 20);
+
+    window.setTimeout(() => {
+      setHighlightedItemId((current) => (current === itemId ? "" : current));
+    }, 1800);
+  }
 
   return (
     <div className={`creator-list-card creator-list-card-collapsed following-profile-list-card ${isExpanded ? "is-expanded" : ""}`.trim()}>
@@ -241,9 +267,54 @@ function FollowingListCard({ list, isExpanded, onToggle }) {
           {list.description ? <p className="creator-list-description">{list.description}</p> : null}
 
           {list.items?.length ? (
+            <div className="creator-list-search">
+              <label htmlFor={`following-list-search-${list.id}`}>Find a show in this list</label>
+              <input
+                id={`following-list-search-${list.id}`}
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search this list..."
+                autoComplete="off"
+              />
+              {normalizedQuery ? (
+                <div className="creator-list-search-results">
+                  {searchMatches.length ? (
+                    searchMatches.map((item) => (
+                      <button
+                        key={`search-${item.id}`}
+                        type="button"
+                        className="creator-list-search-result"
+                        onClick={() => selectSearchResult(item)}
+                      >
+                        <strong>#{item.rank}</strong>
+                        <span>
+                          {item.show_name}
+                          {item.show_year ? <small>{item.show_year}</small> : null}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="creator-list-search-empty">No matching shows found</div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {list.items?.length ? (
             <div className="creator-list-items">
               {list.items.map((item) => (
-                <Link key={item.id} to={showHref(item)} className="creator-list-item">
+                <Link
+                  key={item.id}
+                  ref={(node) => {
+                    const itemId = String(item.id);
+                    if (node) itemRefs.current.set(itemId, node);
+                    else itemRefs.current.delete(itemId);
+                  }}
+                  to={showHref(item)}
+                  className={`creator-list-item${highlightedItemId === String(item.id) ? " is-search-highlight" : ""}`}
+                >
                   <span className="creator-rank">#{item.rank}</span>
                   {item.poster_url ? <img src={item.poster_url} alt="" /> : <span className="creator-mini-poster">?</span>}
                   <span>
