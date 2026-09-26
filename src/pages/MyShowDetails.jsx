@@ -1841,11 +1841,6 @@ const burgrTouchRef = useRef({
                     ? `${Math.round(communityBurgrStats.average)}%`
                     : "—"}
                 </strong>
-                {communityBurgrStats.count > 0 ? (
-                  <small className="msd-stat-subvalue">
-                    {communityBurgrStats.count} rated
-                  </small>
-                ) : null}
               </div>
 
               <div className="msd-stat-box">
