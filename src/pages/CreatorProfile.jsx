@@ -744,6 +744,10 @@ export default function CreatorProfile() {
           video_provider,
           video_embed_url,
           image_url,
+          is_auto_news,
+          source_name,
+          source_url,
+          related_show_id,
           created_at,
           updated_at
         `)
@@ -1223,6 +1227,16 @@ export default function CreatorProfile() {
 
                     {post.title ? <h3>{post.title}</h3> : null}
                     {post.body ? <p>{post.body}</p> : null}
+                    {post.is_auto_news ? (
+                      <div className="creator-news-links">
+                        {post.related_show_id ? <Link to={`/show/${post.related_show_id}`}>View show</Link> : null}
+                        {post.source_url ? (
+                          <a href={post.source_url} target="_blank" rel="noreferrer">
+                            Source{post.source_name ? `: ${post.source_name}` : ""}
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {isOwnProfile ? (
                       <button
