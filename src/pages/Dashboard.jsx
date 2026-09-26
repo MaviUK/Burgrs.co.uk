@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v16_UPCOMING_PROVIDERS";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v17_NEW_TODAY";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -154,7 +154,12 @@ function groupUpcomingByDay(items) {
   (items || []).forEach((item) => {
     const dateKey = normalizeDateOnly(item?.episode?.aired) || "unknown";
     if (!map.has(dateKey)) {
-      const group = { key: dateKey, label: getDayHeading(dateKey), items: [] };
+      const group = {
+        key: dateKey,
+        label: getDayHeading(dateKey),
+        isToday: dateKey === normalizeDateOnly(new Date()),
+        items: [],
+      };
       map.set(dateKey, group);
       groups.push(group);
     }
@@ -684,6 +689,8 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
           show,
           episode: nextEpisode,
           episodesBehind: unwatchedFromCurrentPosition.length,
+          olderEpisodesBehind: olderUnwatched.length,
+          releasedTodayCount: releasedToday.length,
           isNewToday,
           watchedCount,
           totalAired: airedEpisodes.length,
@@ -724,21 +731,25 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     )
     .slice(0, 6);
 
-  const caughtUpShowIds = new Set(
-    visibleShows
-      .filter((show) => {
-        const progress = progressByShow.get(String(show.show_id));
-        return progress && progress.episodesBehind === 0;
-      })
-      .map((show) => String(show.show_id))
-  );
-
   const airingThisWeek = regularEpisodes
     .filter((episode) => {
       const showKey = String(episode.show_id);
-      if (!showsById.has(showKey) || !caughtUpShowIds.has(showKey)) return false;
+      if (!showsById.has(showKey)) return false;
       if (!episode.aired || !isDateWithinNextDays(episode.aired, 7)) return false;
-      return !hasAired(episode.aired) && !watchedIds.has(String(episode.id));
+      if (watchedIds.has(String(episode.id))) return false;
+
+      const progress = progressByShow.get(showKey);
+      if (!progress) return false;
+
+      const episodeDate = normalizeDateOnly(episode.aired);
+
+      // A release today is shown when the user was fully caught up before today.
+      if (episodeDate === todayKey) {
+        return progress.olderEpisodesBehind === 0;
+      }
+
+      // Future releases only show while the user is completely current.
+      return episodeDate > todayKey && progress.episodesBehind === 0;
     })
     .sort((a, b) => {
       if (a.aired !== b.aired) return a.aired.localeCompare(b.aired);
@@ -1203,8 +1214,11 @@ export default function Dashboard() {
           <SectionHeader title="Upcoming This Week" to="/calendar" linkLabel="Calendar" />
           <div className="dashboard-week-groups">
             {upcomingGroups.map((group) => (
-              <div key={group.key} className="dashboard-day-group">
-                <h3>{group.label}</h3>
+              <div
+                key={group.key}
+                className={`dashboard-day-group${group.isToday ? " is-today" : ""}`}
+              >
+                <h3>{group.isToday ? "NEW TODAY" : group.label}</h3>
                 <div className="dashboard-list dashboard-upcoming-list">
                   {group.items.map(({ show, episode, episodes }) => (
                     <DashboardEpisodeItem
