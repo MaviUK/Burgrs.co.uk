@@ -4,8 +4,8 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v10_NEXT_EPISODE";
-const DASHBOARD_CACHE_DURATION = 1000 * 60 * 60 * 24;
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v11_HOME_HUB";
+const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
 function getDashboardCacheKey(userId) {
@@ -48,6 +48,8 @@ function makeEmptyDashboardView() {
     databaseShows: [],
     trendingShows: [],
     premieringSoonShows: [],
+    newsStories: [],
+    friendPicks: [],
     stats: {
       totalShows: 0,
       inProgressCount: 0,
@@ -105,6 +107,60 @@ function formatMinutes(totalMinutes) {
   const hours = Math.floor((minutes % 1440) / 60);
   const mins = minutes % 60;
   return `${days}d ${hours}h ${mins}m`;
+}
+
+function getDayHeading(dateValue) {
+  const normalized = normalizeDateOnly(dateValue);
+  if (!normalized) return "Coming up";
+
+  const target = new Date(`${normalized}T00:00:00`);
+  const today = startOfToday();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (target.getTime() === today.getTime()) return "Today";
+  if (target.getTime() === tomorrow.getTime()) return "Tomorrow";
+
+  return target.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function getPremiereDate(show) {
+  return (
+    normalizeDateOnly(show?.first_air_date) ||
+    normalizeDateOnly(show?.firstAired) ||
+    normalizeDateOnly(show?.premiere_date) ||
+    normalizeDateOnly(show?.aired_date)
+  );
+}
+
+function formatPremiereBadge(show) {
+  const value = getPremiereDate(show);
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  return date
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+}
+
+function groupUpcomingByDay(items) {
+  const groups = [];
+  const map = new Map();
+
+  (items || []).forEach((item) => {
+    const key = normalizeDateOnly(item?.episode?.aired) || "unknown";
+    if (!map.has(key)) {
+      const group = { key, label: getDayHeading(key), items: [] };
+      map.set(key, group);
+      groups.push(group);
+    }
+    map.get(key).items.push(item);
+  });
+
+  return groups;
 }
 
 function getDisplayEpisodeCode(ep) {
@@ -229,6 +285,110 @@ async function fetchPremieringSoonShows() {
       normalizeDateOnly(show?.aired_date);
     return date && isDateWithinNextDays(date, 10);
   });
+}
+
+async function fetchLatestNews() {
+  try {
+    const { data, error } = await supabase
+      .from("creator_posts")
+      .select("id, title, image_url, source_name, source_url, related_show_id, created_at")
+      .eq("is_auto_news", true)
+      .eq("visibility", "public")
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.warn("Dashboard news fetch failed:", error);
+    return [];
+  }
+}
+
+async function fetchFriendPicks(userId) {
+  if (!userId) return [];
+
+  try {
+    const { data: followRows, error: followsError } = await supabase
+      .from("user_follows")
+      .select("following_id")
+      .eq("follower_id", userId);
+
+    if (followsError) throw followsError;
+
+    const followingIds = (followRows || [])
+      .map((row) => row.following_id)
+      .filter(Boolean);
+
+    if (!followingIds.length) return [];
+
+    const { data: ratingRows, error: ratingsError } = await supabase
+      .from("burgr_ratings")
+      .select("user_id, show_id, rating, updated_at")
+      .in("user_id", followingIds)
+      .gte("rating", 70)
+      .order("updated_at", { ascending: false })
+      .limit(100);
+
+    if (ratingsError) throw ratingsError;
+
+    const grouped = new Map();
+    (ratingRows || []).forEach((row) => {
+      const key = String(row.show_id || "");
+      if (!key) return;
+      const current = grouped.get(key) || {
+        show_id: row.show_id,
+        total: 0,
+        count: 0,
+        latest: 0,
+      };
+      current.total += Number(row.rating || 0);
+      current.count += 1;
+      current.latest = Math.max(
+        current.latest,
+        new Date(row.updated_at || 0).getTime() || 0
+      );
+      grouped.set(key, current);
+    });
+
+    const candidates = Array.from(grouped.values())
+      .map((item) => ({
+        ...item,
+        average: Math.round(item.total / Math.max(1, item.count)),
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (b.average !== a.average) return b.average - a.average;
+        return b.latest - a.latest;
+      })
+      .slice(0, 12);
+
+    if (!candidates.length) return [];
+
+    const { data: shows, error: showsError } = await supabase
+      .from("shows")
+      .select("id, tvdb_id, tmdb_id, name, poster_url, first_aired")
+      .in("id", candidates.map((item) => item.show_id));
+
+    if (showsError) throw showsError;
+
+    const showMap = new Map((shows || []).map((show) => [String(show.id), show]));
+
+    return candidates
+      .map((item) => {
+        const show = showMap.get(String(item.show_id));
+        if (!show) return null;
+        return {
+          ...show,
+          friend_rating: item.average,
+          friend_rating_count: item.count,
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.warn("Dashboard friend picks fetch failed:", error);
+    return [];
+  }
 }
 
 async function fetchDatabaseShowMatches(externalShows) {
@@ -509,7 +669,7 @@ function RecentShowCard({ show }) {
   );
 }
 
-function ExternalShowCard({ show, savedShows, databaseShows }) {
+function ExternalShowCard({ show, savedShows, databaseShows, showPremiereDate = false }) {
   const linkTarget = getExternalShowLink(show, savedShows, databaseShows);
   const showName = show?.name || show?.title || "Unknown show";
   const imageSrc =
@@ -518,10 +678,108 @@ function ExternalShowCard({ show, savedShows, databaseShows }) {
     show?.posterUrl ||
     show?.image_url ||
     (show?.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : "");
+  const premiereBadge = showPremiereDate ? formatPremiereBadge(show) : "";
 
-  const content = <Poster src={imageSrc} alt={showName} className="trending-card-image" />;
+  const content = (
+    <>
+      <div className="trending-card-poster-wrap">
+        <Poster src={imageSrc} alt={showName} className="trending-card-image" />
+        {premiereBadge ? <span className="premiere-date-badge">{premiereBadge}</span> : null}
+      </div>
+      {showPremiereDate ? <strong className="trending-card-title">{showName}</strong> : null}
+    </>
+  );
+
   if (!linkTarget) return <div className="trending-card">{content}</div>;
   return <Link to={linkTarget} className="trending-card">{content}</Link>;
+}
+
+function UpNextHero({ item }) {
+  if (!item) return null;
+
+  const { show, episode, watchedCount, totalAired, progress } = item;
+  const backgroundImage = show.backdrop_url || show.poster_url || "";
+
+  return (
+    <Link
+      to={getSavedShowLink(show)}
+      className="up-next-hero"
+      style={backgroundImage ? { backgroundImage: `url("${backgroundImage}")` } : undefined}
+    >
+      <div className="up-next-shade" />
+      <div className="up-next-content">
+        <span className="up-next-kicker">Up Next</span>
+        <h1>{show.show_name || "Unknown show"}</h1>
+        <p>
+          <strong>{getDisplayEpisodeCode(episode)}</strong>
+          <span> · {episode.name || "Next episode"}</span>
+        </p>
+        <div className="up-next-progress" aria-label={`${progress}% watched`}>
+          <span style={{ width: `${Math.max(3, progress)}%` }} />
+        </div>
+        <small>{watchedCount} of {totalAired} aired episodes watched</small>
+        <span className="up-next-action">View episode <b aria-hidden="true">›</b></span>
+      </div>
+    </Link>
+  );
+}
+
+function NewsCard({ story }) {
+  const card = (
+    <>
+      {story.image_url ? (
+        <img src={story.image_url} alt="" className="dashboard-news-image" loading="lazy" />
+      ) : (
+        <div className="dashboard-news-image dashboard-news-image-placeholder">TV</div>
+      )}
+      <div className="dashboard-news-copy">
+        <span>{story.source_name || "TV News"}</span>
+        <strong>{story.title || "Latest TV news"}</strong>
+      </div>
+    </>
+  );
+
+  if (story.source_url) {
+    return (
+      <a
+        href={story.source_url}
+        target="_blank"
+        rel="noreferrer"
+        className="dashboard-news-card"
+      >
+        {card}
+      </a>
+    );
+  }
+
+  if (story.related_show_id) {
+    return (
+      <Link to={`/show/${story.related_show_id}`} className="dashboard-news-card">
+        {card}
+      </Link>
+    );
+  }
+
+  return <div className="dashboard-news-card">{card}</div>;
+}
+
+function FriendPickCard({ show }) {
+  const href = show.tmdb_id
+    ? `/show/tmdb/${show.tmdb_id}`
+    : show.tvdb_id
+      ? `/show/${show.tvdb_id}`
+      : `/show/${show.id}`;
+
+  return (
+    <Link to={href} className="friend-pick-card">
+      <Poster src={show.poster_url} alt={show.name} className="friend-pick-poster" />
+      <strong>{show.name || "Unknown show"}</strong>
+      <span>
+        {show.friend_rating}% · {show.friend_rating_count} rating
+        {show.friend_rating_count === 1 ? "" : "s"}
+      </span>
+    </Link>
+  );
 }
 
 function StatCard({ label, value, to = null }) {
@@ -568,9 +826,10 @@ export default function Dashboard() {
         }
 
         if (!user) {
-          const [trending, premieringSoon] = await Promise.all([
+          const [trending, premieringSoon, newsStories] = await Promise.all([
             fetchTrendingShows().catch(() => []),
             fetchPremieringSoonShows().catch(() => []),
+            fetchLatestNews(),
           ]);
           const databaseShows = await fetchDatabaseShowMatches([
             ...trending,
@@ -582,6 +841,7 @@ export default function Dashboard() {
             databaseShows,
             trendingShows: trending,
             premieringSoonShows: premieringSoon,
+            newsStories,
           };
 
           writeDashboardCache(null, publicView);
@@ -606,6 +866,7 @@ export default function Dashboard() {
               name,
               status,
               poster_url,
+              backdrop_url,
               first_aired
             )
           `)
@@ -626,6 +887,7 @@ export default function Dashboard() {
           show_name: row.shows?.name || "Unknown title",
           status: row.shows?.status || null,
           poster_url: row.shows?.poster_url || null,
+          backdrop_url: row.shows?.backdrop_url || null,
           first_aired: row.shows?.first_aired || null,
         }));
 
@@ -634,13 +896,15 @@ export default function Dashboard() {
           .map((show) => show.show_id)
           .filter(Boolean);
 
-        const [watchedRows, allEpisodes, trending, premieringSoon] = await Promise.all([
+        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks] = await Promise.all([
           showIds.length
             ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
             : Promise.resolve([]),
           showIds.length ? fetchEpisodesForShowIds(showIds) : Promise.resolve([]),
           fetchTrendingShows().catch(() => []),
           fetchPremieringSoonShows().catch(() => []),
+          fetchLatestNews(),
+          fetchFriendPicks(user.id),
         ]);
 
         const databaseShows = await fetchDatabaseShowMatches([
@@ -656,11 +920,16 @@ export default function Dashboard() {
             tmdb_id: show.tmdb_id,
             show_name: show.show_name,
             poster_url: show.poster_url,
+            backdrop_url: show.backdrop_url,
             watch_status: show.watch_status,
           })),
           databaseShows,
           trendingShows: trending,
           premieringSoonShows: premieringSoon,
+          newsStories,
+          friendPicks: friendPicks.filter(
+            (pick) => !showIds.some((showId) => String(showId) === String(pick.id))
+          ),
           stats: buildPersonalDashboard(normalizedShows, allEpisodes, watchedRows),
         };
 
@@ -684,7 +953,12 @@ export default function Dashboard() {
   const databaseShows = dashboardView.databaseShows || [];
   const trendingShows = dashboardView.trendingShows || [];
   const premieringSoonShows = dashboardView.premieringSoonShows || [];
+  const newsStories = dashboardView.newsStories || [];
+  const friendPicks = dashboardView.friendPicks || [];
   const data = dashboardView.stats || makeEmptyDashboardView().stats;
+  const upNext = data.continueWatching?.[0] || null;
+  const continueWatching = (data.continueWatching || []).slice(1);
+  const upcomingGroups = groupUpcomingByDay(data.airingThisWeek || []);
 
   if (loading) {
     return (
@@ -696,53 +970,63 @@ export default function Dashboard() {
 
   return (
     <div className="page dashboard-page">
-      {dashboardView.isSignedIn && data.continueWatching.length > 0 ? (
+      <form action="/search" method="get" className="dashboard-home-search">
+        <span aria-hidden="true">⌕</span>
+        <input
+          type="search"
+          name="q"
+          placeholder="Search shows, actors, creators..."
+          aria-label="Search BURGRS"
+        />
+        <button type="submit">Search</button>
+      </form>
+
+      {dashboardView.isSignedIn && upNext ? (
+        <section className="dashboard-personal-section dashboard-up-next-section">
+          <UpNextHero item={upNext} />
+        </section>
+      ) : null}
+
+      {dashboardView.isSignedIn && continueWatching.length > 0 ? (
         <section className="dashboard-personal-section dashboard-continue-section">
           <SectionHeader title="Continue Watching" to="/my-shows" />
           <div className="continue-row">
-            {data.continueWatching.map((item) => (
+            {continueWatching.map((item) => (
               <ContinueWatchingCard key={`continue-${item.show.show_id}`} item={item} />
             ))}
           </div>
         </section>
       ) : null}
 
-      {dashboardView.isSignedIn && data.airingThisWeek.length > 0 ? (
-        <section className="dashboard-personal-section">
-          <SectionHeader title="Coming Up From My Shows" />
-          <div className="dashboard-list dashboard-upcoming-list">
-            {data.airingThisWeek.map(({ show, episode }) => (
-              <DashboardEpisodeItem
-                key={`${show.show_id}-${episode.id}-week`}
-                show={show}
-                episode={episode}
-              />
+      {dashboardView.isSignedIn && upcomingGroups.length > 0 ? (
+        <section className="dashboard-personal-section dashboard-this-week-section">
+          <SectionHeader title="This Week" to="/calendar" linkLabel="Calendar" />
+          <div className="dashboard-week-groups">
+            {upcomingGroups.map((group) => (
+              <div key={group.key} className="dashboard-day-group">
+                <h3>{group.label}</h3>
+                <div className="dashboard-list dashboard-upcoming-list">
+                  {group.items.map(({ show, episode }) => (
+                    <DashboardEpisodeItem
+                      key={`${show.show_id}-${episode.id}-week`}
+                      show={show}
+                      episode={episode}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
       ) : null}
 
-      {dashboardView.isSignedIn && data.recentlyAdded.length > 0 ? (
-        <section className="dashboard-personal-section">
-          <SectionHeader title="Recently Added" to="/my-shows" />
-          <div className="recent-shows-row">
-            {data.recentlyAdded.map((show) => (
-              <RecentShowCard key={`recent-${show.show_id}`} show={show} />
+      {newsStories.length > 0 ? (
+        <section className="dashboard-personal-section dashboard-news-section">
+          <SectionHeader title="TV News" to="/following" linkLabel="View feed" />
+          <div className="dashboard-news-row">
+            {newsStories.map((story) => (
+              <NewsCard key={story.id} story={story} />
             ))}
-          </div>
-        </section>
-      ) : null}
-
-      {dashboardView.isSignedIn ? (
-        <section className="dashboard-personal-section dashboard-stats-section">
-          <SectionHeader title="Your Stats" />
-          <div className="stats-scroll-row">
-            <div className="stats-grid">
-              <StatCard label="Total Shows" value={data.totalShows} to="/my-shows" />
-              <StatCard label="In Progress" value={data.inProgressCount} />
-              <StatCard label="Completed" value={data.completedCount} />
-              <StatCard label="Time Watched" value={formatMinutes(data.watchedMinutes)} />
-            </div>
           </div>
         </section>
       ) : null}
@@ -766,7 +1050,7 @@ export default function Dashboard() {
       </section>
 
       <section className="trending-section dashboard-discovery-section">
-        <SectionHeader title="Premiering Soon" />
+        <SectionHeader title="Premiering This Week" />
         {premieringSoonShows.length === 0 ? (
           <p className="empty-state">No new shows premiering soon.</p>
         ) : (
@@ -777,11 +1061,37 @@ export default function Dashboard() {
                 show={show}
                 savedShows={savedShows}
                 databaseShows={databaseShows}
+                showPremiereDate
               />
             ))}
           </div>
         )}
       </section>
+
+      {dashboardView.isSignedIn && friendPicks.length > 0 ? (
+        <section className="dashboard-personal-section dashboard-friend-picks-section">
+          <SectionHeader title="Popular With People You Follow" to="/following" />
+          <div className="friend-picks-row">
+            {friendPicks.map((show) => (
+              <FriendPickCard key={`friend-pick-${show.id}`} show={show} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {dashboardView.isSignedIn ? (
+        <section className="dashboard-personal-section dashboard-stats-section dashboard-stats-bottom">
+          <SectionHeader title="Your Stats" />
+          <div className="stats-scroll-row">
+            <div className="stats-grid">
+              <StatCard label="Total Shows" value={data.totalShows} to="/my-shows" />
+              <StatCard label="In Progress" value={data.inProgressCount} />
+              <StatCard label="Completed" value={data.completedCount} />
+              <StatCard label="Time Watched" value={formatMinutes(data.watchedMinutes)} />
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
