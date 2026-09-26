@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v12_CATCH_UP";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v13_BATCH_RELEASES";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -151,13 +151,38 @@ function groupUpcomingByDay(items) {
   const map = new Map();
 
   (items || []).forEach((item) => {
-    const key = normalizeDateOnly(item?.episode?.aired) || "unknown";
-    if (!map.has(key)) {
-      const group = { key, label: getDayHeading(key), items: [] };
-      map.set(key, group);
+    const dateKey = normalizeDateOnly(item?.episode?.aired) || "unknown";
+    if (!map.has(dateKey)) {
+      const group = { key: dateKey, label: getDayHeading(dateKey), items: [] };
+      map.set(dateKey, group);
       groups.push(group);
     }
-    map.get(key).items.push(item);
+
+    const group = map.get(dateKey);
+    const showKey = String(item?.show?.show_id || item?.episode?.show_id || "");
+    const existing = group.items.find(
+      (release) => String(release?.show?.show_id || "") === showKey
+    );
+
+    if (existing) {
+      existing.episodes.push(item.episode);
+      return;
+    }
+
+    group.items.push({
+      show: item.show,
+      episode: item.episode,
+      episodes: [item.episode],
+    });
+  });
+
+  groups.forEach((group) => {
+    group.items.forEach((release) => {
+      release.episodes.sort((a, b) => {
+        if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber;
+        return a.episodeNumber - b.episodeNumber;
+      });
+    });
   });
 
   return groups;
@@ -595,7 +620,6 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
       if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber;
       return a.episodeNumber - b.episodeNumber;
     })
-    .slice(0, 12)
     .map((episode) => ({ show: showsById.get(String(episode.show_id)), episode }));
 
   const recentlyAdded = [...visibleShows]
@@ -668,18 +692,36 @@ function ContinueWatchingCard({ item }) {
   );
 }
 
-function DashboardEpisodeItem({ show, episode }) {
+function DashboardEpisodeItem({ show, episode, episodes = [] }) {
   if (!show || !episode) return null;
+
+  const releaseEpisodes = episodes.length ? episodes : [episode];
+  const firstEpisode = releaseEpisodes[0];
+  const lastEpisode = releaseEpisodes[releaseEpisodes.length - 1];
+  const isBatchRelease = releaseEpisodes.length > 1;
+
+  let releaseLabel = `${getDisplayEpisodeCode(firstEpisode)} · ${firstEpisode.name || "New episode"}`;
+
+  if (isBatchRelease) {
+    const sameSeason = releaseEpisodes.every(
+      (item) => item.seasonNumber === firstEpisode.seasonNumber
+    );
+    const rangeLabel = sameSeason
+      ? `S${String(firstEpisode.seasonNumber).padStart(2, "0")}E${String(firstEpisode.episodeNumber).padStart(2, "0")}–E${String(lastEpisode.episodeNumber).padStart(2, "0")}`
+      : `${getDisplayEpisodeCode(firstEpisode)}–${getDisplayEpisodeCode(lastEpisode)}`;
+
+    releaseLabel = `${rangeLabel} · ${releaseEpisodes.length} episodes`;
+  }
 
   return (
     <Link to={getSavedShowLink(show)} className="dashboard-list-item dashboard-episode-item">
       <Poster src={show.poster_url} alt="" className="dashboard-list-poster" />
       <div className="dashboard-list-copy">
         <strong>{show.show_name || "Unknown show"}</strong>
-        <span>
-          {getDisplayEpisodeCode(episode)} · {episode.name || "New episode"}
-        </span>
-        <small>Airs {formatDate(episode.aired)}</small>
+        <span>{releaseLabel}</span>
+        <small>
+          {isBatchRelease ? "Releases" : "Airs"} {formatDate(firstEpisode.aired)}
+        </small>
       </div>
       <span className="dashboard-list-chevron" aria-hidden="true">›</span>
     </Link>
@@ -1032,11 +1074,12 @@ export default function Dashboard() {
               <div key={group.key} className="dashboard-day-group">
                 <h3>{group.label}</h3>
                 <div className="dashboard-list dashboard-upcoming-list">
-                  {group.items.map(({ show, episode }) => (
+                  {group.items.map(({ show, episode, episodes }) => (
                     <DashboardEpisodeItem
-                      key={`${show.show_id}-${episode.id}-week`}
+                      key={`${show.show_id}-${group.key}-week`}
                       show={show}
                       episode={episode}
+                      episodes={episodes}
                     />
                   ))}
                 </div>
