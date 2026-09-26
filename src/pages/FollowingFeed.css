@@ -167,13 +167,19 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #a78bfa;
+  color: #cbd5e1;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: none;
   box-shadow: none;
   white-space: nowrap;
+}
+
+.following-creator-meta-row .feed-comments-inline-toggle:hover,
+.following-creator-meta-row .feed-comments-inline-toggle:focus-visible,
+.following-creator-meta-row .feed-comments-inline-toggle[aria-expanded="true"] {
+  color: #f472b6;
 }
 
 .following-creator-meta-row .feed-comments-inline-toggle span,
