@@ -465,3 +465,18 @@
   text-decoration: none;
   font-weight: 950;
 }
+
+
+.following-news-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.88rem;
+}
+
+.following-news-links a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
