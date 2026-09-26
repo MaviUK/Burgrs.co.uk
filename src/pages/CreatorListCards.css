@@ -172,3 +172,178 @@
     font-size: 10px;
   }
 }
+
+
+/* Shared expanded list layout
+   Keep long creator lists scannable on mobile and consistent in both
+   creator profiles and the Following feed. */
+.creator-list-expanded-body {
+  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(8, 15, 29, 0.98));
+}
+
+.creator-list-card-collapsed .creator-list-description {
+  margin: 0 0 12px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.creator-list-card-collapsed .creator-list-items {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+}
+
+.creator-list-card-collapsed .creator-list-item {
+  display: grid;
+  grid-template-columns: 38px 50px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 7px 9px 7px 7px;
+  border-radius: 14px;
+  color: #f8fafc;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.creator-list-card-collapsed .creator-list-item:hover,
+.creator-list-card-collapsed .creator-list-item:focus-visible {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(196, 181, 253, 0.28);
+}
+
+.creator-list-card-collapsed .creator-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: #ddd6fe;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.creator-list-card-collapsed .creator-list-item:nth-child(-n + 3) .creator-rank {
+  background: rgba(190, 24, 93, 0.2);
+  border-color: rgba(244, 114, 182, 0.3);
+  color: #fce7f3;
+}
+
+.creator-list-card-collapsed .creator-list-item > img,
+.creator-list-card-collapsed .creator-mini-poster {
+  display: block;
+  width: 50px;
+  height: 70px;
+  min-width: 50px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.creator-list-card-collapsed .creator-mini-poster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-weight: 950;
+}
+
+.creator-list-card-collapsed .creator-list-item > span:last-child {
+  display: block;
+  min-width: 0;
+}
+
+.creator-list-card-collapsed .creator-list-item strong {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-list-card-collapsed .creator-list-item small {
+  display: block;
+  margin-top: 5px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.creator-list-card-collapsed .creator-list-item em {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.12);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+@media (min-width: 720px) {
+  .creator-list-card-collapsed .creator-list-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  .creator-list-expanded-body {
+    padding: 9px;
+  }
+
+  .creator-list-card-collapsed .creator-list-item {
+    grid-template-columns: 34px 44px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 68px;
+    padding: 6px 8px 6px 6px;
+  }
+
+  .creator-list-card-collapsed .creator-rank {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .creator-list-card-collapsed .creator-list-item > img,
+  .creator-list-card-collapsed .creator-mini-poster {
+    width: 44px;
+    min-width: 44px;
+    height: 62px;
+  }
+
+  .creator-list-card-collapsed .creator-list-item strong {
+    font-size: 13px;
+  }
+}
