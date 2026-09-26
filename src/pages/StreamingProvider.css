@@ -321,10 +321,6 @@
     display: none;
   }
 
-  .streaming-provider-controls {
-    grid-template-columns: 1fr;
-  }
-
   .streaming-show-grid {
     gap: 14px 9px;
   }
