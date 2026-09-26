@@ -108,21 +108,33 @@ function allProviders(providerGroups) {
 }
 
 function createProviderCard(provider) {
-  const card = document.createElement("div");
+  const providerName = provider?.provider_name || "Streaming provider";
+  const providerId = provider?.provider_id || "provider";
+  const card = document.createElement("a");
+  const params = new URLSearchParams();
+
+  if (provider?.provider_name) {
+    params.set("name", provider.provider_name);
+  }
+
+  card.href = `/streaming/${encodeURIComponent(providerId)}${
+    params.toString() ? `?${params.toString()}` : ""
+  }`;
   card.className = "public-watch-provider-card";
-  card.title = provider?.provider_name || "Streaming provider";
+  card.title = `Browse ${providerName}`;
+  card.setAttribute("aria-label", `Browse TV shows on ${providerName}`);
 
   const logoUrl = providerLogoUrl(provider);
   if (logoUrl) {
     const image = document.createElement("img");
     image.src = logoUrl;
-    image.alt = provider?.provider_name || "Streaming provider";
+    image.alt = providerName;
     image.className = "public-watch-provider-logo";
     card.appendChild(image);
   }
 
   const name = document.createElement("span");
-  name.textContent = provider?.provider_name || "Provider";
+  name.textContent = providerName;
   card.appendChild(name);
 
   return card;
