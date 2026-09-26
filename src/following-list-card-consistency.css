@@ -84,3 +84,175 @@
   padding: 4px 0 0;
   box-sizing: border-box;
 }
+
+
+/* Follow feed list-card polish
+   Keep list cards compact and move actions out of the artwork. */
+.following-card-list.following-list-creator-layout {
+  gap: 10px;
+  padding: 12px;
+  border-radius: 20px;
+}
+
+.following-card-list.following-list-creator-layout .following-creator-line {
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.following-card-list.following-list-creator-layout .following-avatar {
+  width: 38px;
+  height: 38px;
+}
+
+.following-card-list.following-list-creator-layout .following-creator-copy {
+  padding-top: 0;
+}
+
+.following-card-list.following-list-creator-layout .following-creator-line strong {
+  font-size: 15px;
+  line-height: 1.05;
+}
+
+.following-card-list.following-list-creator-layout .following-creator-meta-row {
+  margin-top: 4px;
+}
+
+.following-card-list.following-list-creator-layout .following-meta-left {
+  gap: 4px;
+  font-size: 11px;
+}
+
+.following-card-list.following-list-creator-layout .following-profile-list-card {
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  > .creator-list-cover-button,
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-content {
+  min-height: 148px !important;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-content {
+  gap: 12px;
+  padding: 13px !important;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-content h3 {
+  max-width: 92%;
+  font-size: 22px;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-content p {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-topline {
+  font-size: 10px;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-cover-topline span {
+  min-height: 24px;
+  padding: 0 8px;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-poster-collage {
+  inset: -12px -14px;
+  gap: 6px;
+  transform: rotate(-3deg) scale(1.05);
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card
+  .creator-list-collage-poster {
+  height: 82px;
+  border-radius: 10px;
+}
+
+/* The generic list styles position this over the artwork.
+   On the feed it reads much better as a real footer row. */
+.following-card-list.following-list-creator-layout .following-list-actions-row {
+  position: static !important;
+  inset: auto !important;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 12px !important;
+  box-sizing: border-box;
+  background: rgba(2, 6, 23, 0.92) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-list-actions-row
+  .following-list-share-proxy,
+.following-card-list.following-list-creator-layout
+  .following-list-actions-row
+  .following-list-comments-proxy {
+  min-height: 20px;
+  color: #c4b5fd;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card.is-expanded
+  > .creator-list-cover-button,
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card.is-expanded
+  .creator-list-cover-content {
+  min-height: 124px !important;
+}
+
+.following-card-list.following-list-creator-layout
+  .following-profile-list-card.is-expanded
+  .creator-list-cover-content h3 {
+  font-size: 19px;
+}
+
+@media (max-width: 380px) {
+  .following-card-list.following-list-creator-layout {
+    padding: 10px;
+  }
+
+  .following-card-list.following-list-creator-layout
+    .following-profile-list-card
+    > .creator-list-cover-button,
+  .following-card-list.following-list-creator-layout
+    .following-profile-list-card
+    .creator-list-cover-content {
+    min-height: 140px !important;
+  }
+
+  .following-card-list.following-list-creator-layout
+    .following-profile-list-card
+    .creator-list-cover-content h3 {
+    max-width: 100%;
+    font-size: 20px;
+  }
+}
