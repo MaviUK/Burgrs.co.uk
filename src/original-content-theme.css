@@ -810,3 +810,32 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline-color: #8b5cf6 !important;
 }
+
+
+/* Keep the Follow feed comment composer on the BURGRS pink palette. */
+.following-page .feed-comment-form textarea:focus,
+.following-page .feed-comment-form textarea:focus-visible {
+  border-color: #970747 !important;
+  box-shadow: 0 0 0 4px rgba(151, 7, 71, 0.2) !important;
+  outline-color: #970747 !important;
+}
+
+.following-page .feed-comment-form button[type="submit"] {
+  background: #970747 !important;
+  color: #ffffff !important;
+  border-color: #970747 !important;
+  box-shadow: 0 10px 22px rgba(151, 7, 71, 0.2) !important;
+}
+
+.following-page .feed-comment-form button[type="submit"]:hover,
+.following-page .feed-comment-form button[type="submit"]:focus-visible {
+  background: #7d063b !important;
+  border-color: #7d063b !important;
+  outline-color: #970747 !important;
+}
+
+.following-page .feed-comment-form button[type="submit"]:disabled {
+  background: #970747 !important;
+  border-color: #970747 !important;
+  opacity: 0.45 !important;
+}
