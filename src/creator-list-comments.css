@@ -294,3 +294,51 @@
     font-size: 12px;
   }
 }
+
+
+/* Creator profile list footer layout fix */
+.creator-page .creator-list-card > .creator-list-actions-row {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  z-index: 2 !important;
+  min-height: 46px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(151, 7, 71, 0.12), rgba(2, 6, 23, 0.96));
+}
+
+.creator-page .creator-list-card .creator-list-cover-content {
+  padding-bottom: 16px !important;
+}
+
+.creator-page
+  .creator-list-actions-row
+  .burgrs-activity-share-btn,
+.creator-page
+  .creator-list-actions-row
+  .creator-list-comments-toggle {
+  color: #f3b4cf !important;
+  -webkit-text-fill-color: #f3b4cf !important;
+}
+
+.creator-page
+  .creator-list-actions-row
+  .burgrs-activity-share-btn:hover,
+.creator-page
+  .creator-list-actions-row
+  .burgrs-activity-share-btn:focus-visible,
+.creator-page
+  .creator-list-actions-row
+  .creator-list-comments-toggle:hover,
+.creator-page
+  .creator-list-actions-row
+  .creator-list-comments-toggle:focus-visible,
+.creator-page
+  .creator-list-actions-row
+  .creator-list-comments-toggle.is-open {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
