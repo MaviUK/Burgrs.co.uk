@@ -247,8 +247,8 @@
 }
 
 .creator-list-comment-form textarea:focus {
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+  border-color: #970747;
+  box-shadow: 0 0 0 3px rgba(151, 7, 71, 0.22);
 }
 
 .creator-list-comments-panel .creator-list-comment-form > button[type="submit"] {
