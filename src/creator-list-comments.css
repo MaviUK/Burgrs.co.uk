@@ -246,9 +246,12 @@
   color: #94a3b8;
 }
 
-.creator-list-comment-form textarea:focus {
-  border-color: #970747;
-  box-shadow: 0 0 0 3px rgba(151, 7, 71, 0.22);
+.creator-list-comment-form textarea:focus,
+.creator-list-comment-form textarea:focus-visible {
+  border-color: #970747 !important;
+  outline: none !important;
+  caret-color: #970747 !important;
+  box-shadow: 0 0 0 3px rgba(151, 7, 71, 0.28) !important;
 }
 
 .creator-list-comments-panel .creator-list-comment-form > button[type="submit"] {
