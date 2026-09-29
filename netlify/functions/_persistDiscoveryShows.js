@@ -27,8 +27,11 @@ function buildMergedRow(show, existing) {
   const tvdbId = normalizePositiveNumber(
     show?.tvdb_id ?? show?.tvdbId ?? null
   );
+  const source = String(show?.source || "").trim().toLowerCase();
   const tmdbId = normalizePositiveNumber(
-    show?.tmdb_id ?? show?.tmdbId ?? show?.id ?? null
+    show?.tmdb_id ??
+      show?.tmdbId ??
+      (source === "tmdb" ? show?.id ?? null : null)
   );
 
   if (!tvdbId) return null;
