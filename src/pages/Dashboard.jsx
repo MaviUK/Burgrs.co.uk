@@ -564,8 +564,11 @@ async function fetchDatabaseShowMatches(externalShows) {
 function getExternalShowLink(show, savedShows, databaseShows) {
   if (!show) return null;
 
-  const tmdbId = show.tmdb_id || show.id || null;
-  const tvdbId = show.tvdb_id || null;
+  const source = String(show.source || "").trim().toLowerCase();
+  const tmdbId =
+    show.tmdb_id || (source === "tmdb" ? show.id || null : null);
+  const tvdbId =
+    show.tvdb_id || (source === "tvdb" ? show.id || null : null);
 
   if (tmdbId) {
     const savedByTmdb = (savedShows || []).find(
