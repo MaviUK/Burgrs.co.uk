@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
 import "./CalendarPage.css";
-import "./Dashboard.css";
 
 function startOfToday() {
   const d = new Date();
@@ -260,9 +259,11 @@ export default function CalendarPage() {
     gap: 6,
     padding: "7px 10px",
     borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: active
+      ? "1px solid rgba(151,7,71,0.72)"
+      : "1px solid rgba(255,255,255,0.08)",
     background: active
-      ? "rgba(99,102,241,0.22)"
+      ? "rgba(151,7,71,0.32)"
       : "rgba(255,255,255,0.05)",
     color: active ? "#ffffff" : "#cbd5e1",
     fontSize: 12,
@@ -299,9 +300,9 @@ export default function CalendarPage() {
             display: "flex",
             gap: 8,
             flexWrap: "wrap",
-            marginTop: 28,
-            marginBottom: 22,
-            paddingTop: 10,
+            marginTop: 18,
+            marginBottom: 14,
+            paddingTop: 0,
           }}
         >
           {rangeButtons.map(([value, icon, label]) => (
@@ -334,22 +335,22 @@ export default function CalendarPage() {
                     <Link
                       key={`${item.showTvdbId}-${item.episodeId}`}
                       to={`/my-shows/${item.showTvdbId}?episode=${item.episodeId}`}
-                      className="dashboard-item"
+                      className="calendar-item"
                     >
                       {item.posterUrl ? (
                         <img
                           src={item.posterUrl}
                           alt={item.showName}
-                          className="dashboard-poster"
+                          className="calendar-poster"
                         />
                       ) : (
-                        <div className="dashboard-poster" />
+                        <div className="calendar-poster calendar-poster-fallback" />
                       )}
 
-                      <div className="dashboard-item-info">
-                        <strong>{item.showName}</strong>
+                      <div className="calendar-main">
+                        <strong className="calendar-show-name">{item.showName}</strong>
 
-                        <span>
+                        <span className="calendar-episode-line">
                           {getEpisodeCode({
                             seasonNumber: item.seasonNumber,
                             number: item.episodeNumber,
@@ -357,7 +358,7 @@ export default function CalendarPage() {
                           - {item.episodeName || "Untitled episode"}
                         </span>
 
-                        <small>Airs: {formatDate(item.aired)}</small>
+                        <small className="calendar-air-date">Airs: {formatDate(item.aired)}</small>
                       </div>
                     </Link>
                   ))}
