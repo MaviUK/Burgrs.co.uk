@@ -72,20 +72,21 @@
 .calendar-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .calendar-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px;
-  border-radius: 28px;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 18px;
   background: #151c2b;
   color: inherit;
   text-decoration: none;
-  border: none;
-  box-shadow: none;
+  border: 1px solid #26324a;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
 }
 
 .calendar-item:hover {
@@ -112,18 +113,23 @@
 }
 
 .calendar-show-name {
-  font-size: 22px;
+  display: block;
+  font-size: 18px;
   font-weight: 900;
   color: #f8fafc;
   line-height: 1.15;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-episode-line {
-  font-size: 19px;
+  display: block;
+  font-size: 14px;
   color: #cbd5e1;
   line-height: 1.3;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,9 +142,10 @@
 }
 
 .calendar-air-date {
-  font-size: 17px;
+  display: block;
+  font-size: 12px;
   color: #94a3b8;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .calendar-date {
@@ -175,32 +182,32 @@
     display: flex !important;
     grid-template-columns: none !important;
     align-items: center !important;
-    gap: 16px !important;
-    padding: 18px !important;
-    margin-bottom: 16px !important;
-    border-radius: 28px !important;
+    gap: 12px !important;
+    padding: 10px !important;
+    margin-bottom: 0 !important;
+    border-radius: 16px !important;
     background: #151c2b !important;
-    border: none !important;
-    box-shadow: none !important;
+    border: 1px solid #26324a !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18) !important;
   }
 
   .calendar-poster {
-    width: 76px !important;
-    height: 110px !important;
-    border-radius: 14px !important;
+    width: 68px !important;
+    height: 98px !important;
+    border-radius: 12px !important;
     flex-shrink: 0 !important;
   }
 
   .calendar-show-name {
-    font-size: 22px;
+    font-size: 17px;
   }
 
   .calendar-episode-line {
-    font-size: 19px;
+    font-size: 13px;
   }
 
   .calendar-air-date {
-    font-size: 17px;
+    font-size: 12px;
   }
 
   .calendar-date {
