@@ -10,13 +10,59 @@ function startOfToday() {
   return d;
 }
 
+function addDays(date, amount) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function formatGroupLabel(dateString) {
-  const date = new Date(dateString);
+  const date = new Date(`${dateString}T00:00:00`);
   return date.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
+}
+
+function formatWeekRange(start, endExclusive) {
+  const end = addDays(endExclusive, -1);
+  const startLabel = start.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+  const endLabel = end.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: start.getFullYear() !== end.getFullYear() ? "numeric" : undefined,
+  });
+
+  return `${startLabel} – ${endLabel}`;
+}
+
+function getRangeWindow(range, weekOffset) {
+  const today = startOfToday();
+  const start = new Date(today);
+  let end = null;
+
+  if (range === "today") {
+    end = addDays(start, 1);
+  } else if (range === "week") {
+    start.setDate(start.getDate() + weekOffset * 7);
+    end = addDays(start, 7);
+  } else if (range === "month") {
+    end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+  }
+
+  return { start, end };
 }
 
 function getEpisodeCode(ep) {
@@ -48,8 +94,21 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [range, setRange] = useState("week");
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const activeWindow = useMemo(
+    () => getRangeWindow(range, weekOffset),
+    [range, weekOffset]
+  );
+
+  const weekRangeLabel = useMemo(() => {
+    if (range !== "week" || !activeWindow.end) return "";
+    return formatWeekRange(activeWindow.start, activeWindow.end);
+  }, [activeWindow, range]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadCalendar() {
       setLoading(true);
 
@@ -59,7 +118,7 @@ export default function CalendarPage() {
         } = await supabase.auth.getUser();
 
         if (!user) {
-          setItems([]);
+          if (!cancelled) setItems([]);
           return;
         }
 
@@ -116,13 +175,14 @@ export default function CalendarPage() {
         }
 
         if (showIds.length === 0) {
-          setItems([]);
+          if (!cancelled) setItems([]);
           return;
         }
 
-        const today = startOfToday();
+        const { start, end } = getRangeWindow(range, weekOffset);
+        const viewingPastWeek = range === "week" && weekOffset < 0;
 
-        const { data: episodeRows, error: episodesError } = await supabase
+        let episodesQuery = supabase
           .from("episodes")
           .select(`
             id,
@@ -133,17 +193,24 @@ export default function CalendarPage() {
             aired_date
           `)
           .in("show_id", showIds)
-          .gte("aired_date", today.toISOString().slice(0, 10))
+          .gte("aired_date", toDateKey(start))
           .order("aired_date", { ascending: true })
           .order("season_number", { ascending: true })
           .order("episode_number", { ascending: true });
+
+        if (end) {
+          episodesQuery = episodesQuery.lt("aired_date", toDateKey(end));
+        }
+
+        const { data: episodeRows, error: episodesError } = await episodesQuery;
 
         if (episodesError) throw episodesError;
 
         const episodesByShow = {};
 
         for (const row of episodeRows || []) {
-          if (watchedEpisodeIds.has(String(row.id))) continue;
+          const isWatched = watchedEpisodeIds.has(String(row.id));
+          if (!viewingPastWeek && isWatched) continue;
 
           const show = showLookup[row.show_id];
           if (!show) continue;
@@ -151,13 +218,8 @@ export default function CalendarPage() {
           const airValue = row.aired_date;
           if (!airValue) continue;
 
-          const airDate = new Date(airValue);
+          const airDate = new Date(`${airValue}T00:00:00`);
           if (Number.isNaN(airDate.getTime())) continue;
-
-          const airDay = new Date(airDate);
-          airDay.setHours(0, 0, 0, 0);
-
-          if (airDay < today) continue;
 
           if (!episodesByShow[row.show_id]) {
             episodesByShow[row.show_id] = [];
@@ -174,6 +236,7 @@ export default function CalendarPage() {
             seasonNumber: row.season_number,
             episodeNumber: row.episode_number,
             aired: row.aired_date,
+            watched: isWatched,
           });
         }
 
@@ -182,56 +245,41 @@ export default function CalendarPage() {
         Object.values(episodesByShow).forEach((showEpisodes) => {
           if (!showEpisodes.length) return;
 
-          const firstUpcomingEpisode = showEpisodes[0];
-          const status = normalizeStatus(firstUpcomingEpisode.watchStatus);
+          const firstEpisode = showEpisodes[0];
+          const status = normalizeStatus(firstEpisode.watchStatus);
 
           if (isArchivedStatus(status)) return;
 
-          if (isWatchlistStatus(status)) {
-            if (!isFirstEpisode(firstUpcomingEpisode)) return;
+          if (!viewingPastWeek && isWatchlistStatus(status)) {
+            if (!isFirstEpisode(firstEpisode)) return;
           }
 
           collected.push(...showEpisodes);
         });
 
         collected.sort((a, b) => new Date(a.aired) - new Date(b.aired));
-        setItems(collected);
+
+        if (!cancelled) setItems(collected);
       } catch (error) {
         console.error("Failed loading calendar:", error);
-        setItems([]);
+        if (!cancelled) setItems([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadCalendar();
-  }, []);
 
-  const filteredItems = useMemo(() => {
-    const today = startOfToday();
-    const end = new Date(today);
-
-    if (range === "today") {
-      end.setDate(today.getDate() + 1);
-    } else if (range === "week") {
-      end.setDate(today.getDate() + 7);
-    } else if (range === "month") {
-      end.setMonth(today.getMonth() + 1);
-    }
-
-    if (range === "all") return items;
-
-    return items.filter((item) => {
-      const d = new Date(item.aired);
-      return d >= today && d < end;
-    });
-  }, [items, range]);
+    return () => {
+      cancelled = true;
+    };
+  }, [range, weekOffset]);
 
   const groupedItems = useMemo(() => {
     const groups = {};
 
-    filteredItems.forEach((item) => {
-      const key = new Date(item.aired).toISOString().slice(0, 10);
+    items.forEach((item) => {
+      const key = item.aired;
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
@@ -243,7 +291,7 @@ export default function CalendarPage() {
         label: formatGroupLabel(date),
         episodes,
       }));
-  }, [filteredItems]);
+  }, [items]);
 
   const rangeButtons = [
     ["today", "⌂", "Today"],
@@ -274,25 +322,17 @@ export default function CalendarPage() {
     whiteSpace: "nowrap",
   });
 
-  if (loading) {
-    return (
-      <div className="calendar-page">
-        <div className="calendar-shell">
-          <div className="calendar-header">
-            <h1>Calendar</h1>
-            <p>Loading upcoming episodes...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const emptyMessage =
+    range === "week" && weekOffset < 0
+      ? "No episodes from your saved shows in this week."
+      : "No upcoming episodes in this range.";
 
   return (
     <div className="calendar-page">
       <div className="calendar-shell">
         <div className="calendar-header">
           <h1>Calendar</h1>
-          <p>Upcoming episodes from your saved shows.</p>
+          <p>Episodes from your saved shows, including previous weeks.</p>
         </div>
 
         <div
@@ -309,7 +349,10 @@ export default function CalendarPage() {
             <button
               key={value}
               type="button"
-              onClick={() => setRange(value)}
+              onClick={() => {
+                setRange(value);
+                if (value === "week") setWeekOffset(0);
+              }}
               style={filterButtonStyle(range === value)}
             >
               <span style={{ fontSize: 13, lineHeight: 1 }}>{icon}</span>
@@ -318,9 +361,41 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        {groupedItems.length === 0 ? (
+        {range === "week" ? (
+          <div className="calendar-week-nav" aria-label="Week navigation">
+            <button
+              type="button"
+              className="calendar-week-nav-button"
+              onClick={() => setWeekOffset((current) => current - 1)}
+            >
+              ← Previous
+            </button>
+
+            <div className="calendar-week-nav-label">
+              <strong>{weekOffset === 0 ? "This week" : weekRangeLabel}</strong>
+              {weekOffset === 0 ? <span>{weekRangeLabel}</span> : null}
+            </div>
+
+            <button
+              type="button"
+              className="calendar-week-nav-button"
+              onClick={() =>
+                setWeekOffset((current) => Math.min(0, current + 1))
+              }
+              disabled={weekOffset === 0}
+            >
+              Next →
+            </button>
+          </div>
+        ) : null}
+
+        {loading ? (
           <div className="calendar-empty">
-            <p>No upcoming episodes in this range.</p>
+            <p>Loading episodes...</p>
+          </div>
+        ) : groupedItems.length === 0 ? (
+          <div className="calendar-empty">
+            <p>{emptyMessage}</p>
           </div>
         ) : (
           <div className="calendar-groups">
@@ -348,7 +423,12 @@ export default function CalendarPage() {
                       )}
 
                       <div className="calendar-main">
-                        <strong className="calendar-show-name">{item.showName}</strong>
+                        <div className="calendar-title-row">
+                          <strong className="calendar-show-name">{item.showName}</strong>
+                          {range === "week" && weekOffset < 0 && item.watched ? (
+                            <span className="calendar-watched-badge">Watched</span>
+                          ) : null}
+                        </div>
 
                         <span className="calendar-episode-line">
                           {getEpisodeCode({
@@ -358,7 +438,10 @@ export default function CalendarPage() {
                           - {item.episodeName || "Untitled episode"}
                         </span>
 
-                        <small className="calendar-air-date">Airs: {formatDate(item.aired)}</small>
+                        <small className="calendar-air-date">
+                          {weekOffset < 0 && range === "week" ? "Aired" : "Airs"}:{" "}
+                          {formatDate(item.aired)}
+                        </small>
                       </div>
                     </Link>
                   ))}
