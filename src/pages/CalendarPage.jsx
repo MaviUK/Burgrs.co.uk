@@ -425,8 +425,8 @@ export default function CalendarPage() {
                       <div className="calendar-main">
                         <div className="calendar-title-row">
                           <strong className="calendar-show-name">{item.showName}</strong>
-                          {range === "week" && weekOffset < 0 && item.watched ? (
-                            <span className="calendar-watched-badge">Watched</span>
+                          {item.watched ? (
+                            <span className="calendar-watched-badge">✓ Watched</span>
                           ) : null}
                         </div>
 
