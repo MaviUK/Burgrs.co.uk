@@ -771,3 +771,24 @@
     grid-auto-columns: minmax(176px, 72vw);
   }
 }
+
+
+.following-taste-head-actions {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.following-taste-head-actions a {
+  color: #f9a8d4;
+  font-size: 10px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .following-taste-head-actions {
+    margin-top: 6px;
+    justify-items: start;
+  }
+}
