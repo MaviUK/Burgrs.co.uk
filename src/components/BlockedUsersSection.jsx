@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import "./BlockedUsersSection.css";
 
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
+
+function isProtectedBurgrsTvProfile(profile) {
+  if (!profile) return false;
+  if (String(profile.id || "") === BURGRS_TV_PROFILE_ID) return true;
+
+  return [profile.username, profile.display_name, profile.full_name]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .includes("burgrs tv");
+}
+
 function getName(profile) {
   return (
     profile?.display_name ||
@@ -35,7 +46,11 @@ export default function BlockedUsersSection() {
   const [message, setMessage] = useState("");
 
   const visibleResults = useMemo(
-    () => results.filter((profile) => profile.id !== currentUserId),
+    () =>
+      results.filter(
+        (profile) =>
+          profile.id !== currentUserId && !isProtectedBurgrsTvProfile(profile)
+      ),
     [results, currentUserId]
   );
 
@@ -183,7 +198,8 @@ export default function BlockedUsersSection() {
       !profile?.id ||
       savingId ||
       followSavingId ||
-      blockedIds.has(profile.id)
+      blockedIds.has(profile.id) ||
+      isProtectedBurgrsTvProfile(profile)
     ) {
       return;
     }
@@ -238,7 +254,15 @@ export default function BlockedUsersSection() {
   }
 
   async function blockUser(profile) {
-    if (!currentUserId || !profile?.id || savingId || followSavingId) return;
+    if (
+      !currentUserId ||
+      !profile?.id ||
+      savingId ||
+      followSavingId ||
+      isProtectedBurgrsTvProfile(profile)
+    ) {
+      return;
+    }
 
     const confirmed = window.confirm(
       `Block ${getName(profile)}? You will unfollow each other and they will no longer be able to follow or notify you.`
