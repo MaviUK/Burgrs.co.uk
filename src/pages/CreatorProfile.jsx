@@ -366,6 +366,13 @@ export default function CreatorProfile() {
   const [tasteMatchLoading, setTasteMatchLoading] = useState(false);
   const [tasteSummary, setTasteSummary] = useState(null);
   const [tasteSummaryLoading, setTasteSummaryLoading] = useState(false);
+  const [tasteBrowseCategory, setTasteBrowseCategory] = useState("");
+  const [tasteBrowseItems, setTasteBrowseItems] = useState([]);
+  const [tasteBrowseLoading, setTasteBrowseLoading] = useState(false);
+  const [tasteBrowseError, setTasteBrowseError] = useState("");
+  const [tasteBrowsePage, setTasteBrowsePage] = useState(0);
+  const [tasteBrowseHasMore, setTasteBrowseHasMore] = useState(false);
+  const [tasteBrowseTotal, setTasteBrowseTotal] = useState(0);
   const [expandedListIds, setExpandedListIds] = useState(() => new Set());
 
   const isOwnProfile = useMemo(() => {
@@ -466,6 +473,13 @@ export default function CreatorProfile() {
     setTasteMatchLoading(false);
     setTasteSummary(null);
     setTasteSummaryLoading(false);
+    setTasteBrowseCategory("");
+    setTasteBrowseItems([]);
+    setTasteBrowseLoading(false);
+    setTasteBrowseError("");
+    setTasteBrowsePage(0);
+    setTasteBrowseHasMore(false);
+    setTasteBrowseTotal(0);
 
     const [showRows, creatorRows, episodeResult] = await Promise.all([
       fetchAllSystemShows(),
@@ -695,6 +709,73 @@ export default function CreatorProfile() {
     } catch (err) {
       console.warn("Failed loading following:", err);
       setFollowing([]);
+    }
+  }
+
+  async function loadTasteBrowse(category, append = false) {
+    if (!currentUser?.id || !profile?.id || tasteBrowseLoading) return;
+
+    if (!append && tasteBrowseCategory === category) {
+      setTasteBrowseCategory("");
+      setTasteBrowseItems([]);
+      setTasteBrowseError("");
+      setTasteBrowsePage(0);
+      setTasteBrowseHasMore(false);
+      setTasteBrowseTotal(0);
+      return;
+    }
+
+    const nextPage = append ? tasteBrowsePage + 1 : 1;
+    setTasteBrowseCategory(category);
+    setTasteBrowseLoading(true);
+    setTasteBrowseError("");
+
+    if (!append) {
+      setTasteBrowseItems([]);
+      setTasteBrowsePage(0);
+      setTasteBrowseHasMore(false);
+      setTasteBrowseTotal(0);
+    }
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("You must be logged in.");
+
+      const response = await fetch("/.netlify/functions/taste-match-shows", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          targetUserId: profile.id,
+          category,
+          page: nextPage,
+          pageSize: 48,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.error || "Could not load shows.");
+      }
+
+      const incoming = result?.items || [];
+      setTasteBrowseItems((current) =>
+        append ? [...current, ...incoming] : incoming
+      );
+      setTasteBrowsePage(Number(result?.page || nextPage));
+      setTasteBrowseHasMore(Boolean(result?.hasMore));
+      setTasteBrowseTotal(Number(result?.total || incoming.length));
+    } catch (err) {
+      console.warn("Failed loading profile shows:", err);
+      setTasteBrowseError(err.message || "Could not load shows.");
+      if (!append) setTasteBrowseItems([]);
+    } finally {
+      setTasteBrowseLoading(false);
     }
   }
 
@@ -1483,7 +1564,13 @@ export default function CreatorProfile() {
               match: tasteSummary?.airing?.match,
             },
           ].map((item) => (
-            <div key={item.key} className="creator-taste-strip-item">
+            <button
+              key={item.key}
+              type="button"
+              className={`creator-taste-strip-item creator-taste-strip-button${tasteBrowseCategory === item.key ? " is-active" : ""}`}
+              onClick={() => loadTasteBrowse(item.key)}
+              aria-pressed={tasteBrowseCategory === item.key}
+            >
               <strong>
                 {tasteSummaryLoading ? "…" : item.count ?? "--"}
               </strong>
@@ -1495,7 +1582,7 @@ export default function CreatorProfile() {
                   ? "No overlap yet"
                   : `${item.match}% match`}
               </small>
-            </div>
+            </button>
           ))}
 
           <div className="creator-taste-strip-item creator-taste-strip-overall">
@@ -1515,6 +1602,88 @@ export default function CreatorProfile() {
                 : tasteMatch.confidence}
             </small>
           </div>
+        </section>
+      ) : null}
+
+      {tasteBrowseCategory ? (
+        <section className="creator-card creator-taste-browser">
+          <div className="creator-section-head creator-taste-browser-head">
+            <div>
+              <h2>
+                {tasteBrowseCategory === "total"
+                  ? `${displayName}'s shows`
+                  : tasteBrowseCategory === "completed"
+                  ? `${displayName}'s completed shows`
+                  : tasteBrowseCategory === "watching"
+                  ? `${displayName} is watching`
+                  : `${displayName}'s currently airing shows`}
+              </h2>
+              <span>
+                {tasteBrowseLoading && !tasteBrowseItems.length
+                  ? "Loading..."
+                  : `${tasteBrowseTotal.toLocaleString("en-GB")} show${tasteBrowseTotal === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="creator-taste-browser-close"
+              onClick={() => {
+                setTasteBrowseCategory("");
+                setTasteBrowseItems([]);
+                setTasteBrowseError("");
+                setTasteBrowsePage(0);
+                setTasteBrowseHasMore(false);
+                setTasteBrowseTotal(0);
+              }}
+              aria-label="Close show list"
+            >
+              ×
+            </button>
+          </div>
+
+          {tasteBrowseError ? (
+            <p className="creator-error">{tasteBrowseError}</p>
+          ) : null}
+
+          {tasteBrowseItems.length ? (
+            <div className="creator-taste-show-grid">
+              {tasteBrowseItems.map((show) => (
+                <Link
+                  key={show.id}
+                  to={showHref(show)}
+                  className="creator-taste-show-card"
+                >
+                  {show.poster_url ? (
+                    <img src={show.poster_url} alt="" loading="lazy" />
+                  ) : (
+                    <div className="creator-taste-show-fallback">No poster</div>
+                  )}
+                  <div>
+                    <strong>{show.name || "Untitled show"}</strong>
+                    <span>
+                      {getShowYear(show)}
+                      {show.status ? `${getShowYear(show) ? " • " : ""}${show.status}` : ""}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : tasteBrowseLoading ? (
+            <p className="creator-muted">Loading shows...</p>
+          ) : !tasteBrowseError ? (
+            <p className="creator-muted">No shows in this section.</p>
+          ) : null}
+
+          {tasteBrowseHasMore ? (
+            <button
+              type="button"
+              className="creator-btn creator-btn-secondary creator-taste-load-more"
+              onClick={() => loadTasteBrowse(tasteBrowseCategory, true)}
+              disabled={tasteBrowseLoading}
+            >
+              {tasteBrowseLoading ? "Loading..." : "Load more shows"}
+            </button>
+          ) : null}
         </section>
       ) : null}
 
