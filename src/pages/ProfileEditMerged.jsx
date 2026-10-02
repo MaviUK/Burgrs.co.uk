@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabase";
 import NotificationPreferences from "../components/NotificationPreferences";
 import RecommendationHistory from "../components/RecommendationHistory";
 
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
+
 function normalizeUrl(value) {
   const trimmed = (value || "").trim();
   if (!trimmed) return "";
@@ -104,6 +106,7 @@ function formatDobForInput(value) {
 export default function ProfileEditMerged() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -152,6 +155,7 @@ export default function ProfileEditMerged() {
           navigate("/login", { replace: true });
           return;
         }
+        setCurrentUserId(user.id);
 
         const { data, error: profileError } = await supabase
           .from("profiles")
@@ -647,6 +651,11 @@ export default function ProfileEditMerged() {
           <Link to={profileHref} style={secondaryButtonStyle}>
             View creator page
           </Link>
+          {currentUserId === BURGRS_TV_PROFILE_ID ? (
+            <Link to="/admin/health" style={secondaryButtonStyle}>
+              System health
+            </Link>
+          ) : null}
           <button type="button" onClick={handleLogout} style={secondaryButtonStyle}>
             Log out
           </button>
