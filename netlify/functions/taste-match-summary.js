@@ -41,22 +41,37 @@ async function verifyUser({ supabaseUrl, anonKey, accessToken }) {
 }
 
 async function serviceGet({ supabaseUrl, serviceRoleKey, table, params }) {
-  const response = await fetch(
-    `${supabaseUrl}/rest/v1/${encodeURIComponent(table)}?${params.toString()}`,
-    {
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        Accept: "application/json",
-      },
-    }
-  );
+  const rows = [];
+  const pageSize = 1000;
+  let offset = 0;
 
-  const data = await readJson(response);
-  if (!response.ok) {
-    throw new Error(data?.message || `Could not read ${table}.`);
+  while (true) {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/${encodeURIComponent(table)}?${params.toString()}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Accept: "application/json",
+          Range: `${offset}-${offset + pageSize - 1}`,
+          "Range-Unit": "items",
+        },
+      }
+    );
+
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(data?.message || `Could not read ${table}.`);
+    }
+
+    const batch = Array.isArray(data) ? data : [];
+    rows.push(...batch);
+
+    if (batch.length < pageSize) break;
+    offset += pageSize;
   }
-  return Array.isArray(data) ? data : [];
+
+  return rows;
 }
 
 function overlapPercent(a, b) {
