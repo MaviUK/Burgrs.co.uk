@@ -468,6 +468,15 @@ function mergeShows(existing, incoming) {
     }));
 }
 
+function rankdGenreLabel(genre) {
+  if (genre === "Science Fiction") return "Sci-Fi";
+  if (genre === "Mini-Series") return "Mini-Series";
+  if (genre === "Game Show") return "Game Show";
+  if (genre === "Talk Show") return "Talk Show";
+  if (genre === "Home and Garden") return "Home & Garden";
+  return genre;
+}
+
 function getShowYear(show) {
   const year = Number(String(show?.first_aired || "").slice(0, 4));
   return Number.isFinite(year) ? year : null;
@@ -1503,14 +1512,23 @@ export default function Rankd() {
                   >
                     2020s
                   </button>
-                  {["Comedy", "Crime", "Drama", "Thriller"].map((genre) => (
+                  {[
+                    "Drama",
+                    "Comedy",
+                    "Crime",
+                    "Thriller",
+                    "Action",
+                    "Mystery",
+                    "Science Fiction",
+                    "Horror",
+                  ].map((genre) => (
                     <button
                       key={genre}
                       type="button"
                       className={genreFilter === genre ? "is-active" : ""}
                       onClick={() => applyQuickRankdFilter("genre", genre)}
                     >
-                      {genre}
+                      {rankdGenreLabel(genre)}
                     </button>
                   ))}
                   <button
@@ -1524,20 +1542,28 @@ export default function Rankd() {
 
                 {showFilters ? (
                   <div className="rankd-filter-panel">
-                    <label>
+                    <div className="rankd-genre-picker">
                       <span>Genre</span>
-                      <select
-                        value={genreFilter}
-                        onChange={(event) => setGenreFilter(event.target.value)}
-                      >
-                        <option value="">All genres</option>
+                      <div className="rankd-genre-grid">
+                        <button
+                          type="button"
+                          className={!genreFilter ? "is-active" : ""}
+                          onClick={() => setGenreFilter("")}
+                        >
+                          All genres
+                        </button>
                         {availableGenres.map((genre) => (
-                          <option key={genre} value={genre}>
-                            {genre}
-                          </option>
+                          <button
+                            key={genre}
+                            type="button"
+                            className={genreFilter === genre ? "is-active" : ""}
+                            onClick={() => setGenreFilter(genre)}
+                          >
+                            {rankdGenreLabel(genre)}
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
 
                     <label>
                       <span>First aired</span>
