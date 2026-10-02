@@ -42,6 +42,23 @@ function normalizeShowRow(row, ranking = null, fallbackPosition = null) {
     tvdb_id: show?.tvdb_id || row?.tvdb_id || null,
     show_name: show?.name || row?.show_name || row?.name || "Unknown title",
     poster_url: show?.poster_url || row?.poster_url || null,
+    genres: Array.isArray(show?.genres) ? show.genres : Array.isArray(row?.genres) ? row.genres : [],
+    first_aired: show?.first_aired || row?.first_aired || null,
+    status: show?.status || row?.status || null,
+    network: show?.network || row?.network || null,
+    rating_average:
+      Number.isFinite(Number(show?.rating_average))
+        ? Number(show.rating_average)
+        : Number.isFinite(Number(row?.rating_average))
+        ? Number(row.rating_average)
+        : null,
+    user_rating:
+      Number.isFinite(Number(row?.user_rating))
+        ? Number(row.user_rating)
+        : Number.isFinite(Number(show?.user_rating))
+        ? Number(show.user_rating)
+        : null,
+    watch_status: row?.watch_status || show?.watch_status || null,
     ladder_position: ranking?.ladder_position ?? fallbackPosition,
     rank_wins: ranking?.wins ?? 0,
     rank_losses: ranking?.losses ?? 0,
@@ -320,6 +337,40 @@ async function fetchRankdShowPage(userId, from, to) {
   }));
 }
 
+async function fetchShowFilterMetadata(userId, showIds) {
+  const ids = Array.from(new Set((showIds || []).filter(Boolean).map(String)));
+  const showMap = new Map();
+  const ratingMap = new Map();
+  if (!ids.length) return { showMap, ratingMap };
+
+  for (let i = 0; i < ids.length; i += 100) {
+    const batch = ids.slice(i, i + 100);
+    const [showResult, ratingResult] = await Promise.all([
+      supabase
+        .from("shows")
+        .select("id,genres,first_aired,status,network,rating_average")
+        .in("id", batch),
+      userId
+        ? supabase
+            .from("burgr_ratings")
+            .select("show_id,rating")
+            .eq("user_id", userId)
+            .in("show_id", batch)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (showResult.error) throw showResult.error;
+    if (ratingResult.error) throw ratingResult.error;
+
+    (showResult.data || []).forEach((row) => showMap.set(String(row.id), row));
+    (ratingResult.data || []).forEach((row) =>
+      ratingMap.set(String(row.show_id), Number(row.rating))
+    );
+  }
+
+  return { showMap, ratingMap };
+}
+
 async function fetchRankingMap(userId, showIds) {
   const ids = Array.from(new Set((showIds || []).filter(Boolean).map(String)));
   const map = new Map();
@@ -417,6 +468,62 @@ function mergeShows(existing, incoming) {
     }));
 }
 
+function getShowYear(show) {
+  const year = Number(String(show?.first_aired || "").slice(0, 4));
+  return Number.isFinite(year) ? year : null;
+}
+
+function showMatchesRankdFilters(show, filters) {
+  const genre = String(filters.genre || "").trim().toLowerCase();
+  if (
+    genre &&
+    !(show.genres || []).some(
+      (item) => String(item || "").trim().toLowerCase() === genre
+    )
+  ) {
+    return false;
+  }
+
+  const year = getShowYear(show);
+  const currentYear = new Date().getFullYear();
+
+  if (filters.period === "this_year" && year !== currentYear) return false;
+
+  if (filters.period?.startsWith("decade:")) {
+    const start = Number(filters.period.split(":")[1]);
+    if (!year || year < start || year > start + 9) return false;
+  }
+
+  if (filters.period?.startsWith("year:")) {
+    const selectedYear = Number(filters.period.split(":")[1]);
+    if (year !== selectedYear) return false;
+  }
+
+  if (
+    filters.status &&
+    String(show.status || "").trim().toLowerCase() !==
+      String(filters.status).trim().toLowerCase()
+  ) {
+    return false;
+  }
+
+  if (
+    filters.progress &&
+    String(show.watch_status || "").trim().toLowerCase() !==
+      String(filters.progress).trim().toLowerCase()
+  ) {
+    return false;
+  }
+
+  const minimumRating = Number(filters.minRating || 0);
+  if (minimumRating > 0) {
+    const rating = Number(show.user_rating);
+    if (!Number.isFinite(rating) || rating < minimumRating) return false;
+  }
+
+  return true;
+}
+
 function RankCard({ show, onChoose, onTouchStart, onTouchEnd, disabledLabel = "" }) {
   return (
     <button
@@ -461,6 +568,12 @@ export default function Rankd() {
   const [moveModalShow, setMoveModalShow] = useState(null);
   const [moveTargetRank, setMoveTargetRank] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [progressFilter, setProgressFilter] = useState("");
+  const [minRatingFilter, setMinRatingFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   const touchStartX = useRef(null);
   const saveQueueRef = useRef(Promise.resolve());
@@ -471,9 +584,76 @@ export default function Rankd() {
   const currentPairKey =
     currentPair.length === 2 ? makePairKey(currentPair[0].show_id, currentPair[1].show_id) : "";
 
-  const leaderboard = useMemo(() => [...eligibleShows].sort(sortByLadder), [eligibleShows]);
+  const allLeaderboard = useMemo(
+    () => [...eligibleShows].sort(sortByLadder),
+    [eligibleShows]
+  );
+
+  const availableGenres = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          eligibleShows.flatMap((show) =>
+            Array.isArray(show.genres) ? show.genres.filter(Boolean) : []
+          )
+        )
+      ).sort((a, b) => String(a).localeCompare(String(b))),
+    [eligibleShows]
+  );
+
+  const availableYears = useMemo(
+    () =>
+      Array.from(
+        new Set(eligibleShows.map(getShowYear).filter(Boolean))
+      ).sort((a, b) => b - a),
+    [eligibleShows]
+  );
+
+  const activeFilters = useMemo(
+    () => ({
+      genre: genreFilter,
+      period: periodFilter,
+      status: statusFilter,
+      progress: progressFilter,
+      minRating: minRatingFilter,
+    }),
+    [genreFilter, periodFilter, statusFilter, progressFilter, minRatingFilter]
+  );
+
+  const leaderboard = useMemo(
+    () => allLeaderboard.filter((show) => showMatchesRankdFilters(show, activeFilters)),
+    [allLeaderboard, activeFilters]
+  );
+
+  const filtersActive = Boolean(
+    genreFilter || periodFilter || statusFilter || progressFilter || minRatingFilter
+  );
   const isSharedPage = Boolean(sharedSlug);
   const isLoggedIn = Boolean(userId);
+
+  function resetRankdFilters() {
+    setGenreFilter("");
+    setPeriodFilter("");
+    setStatusFilter("");
+    setProgressFilter("");
+    setMinRatingFilter("");
+  }
+
+  function applyQuickRankdFilter(type, value = "") {
+    if (type === "all") {
+      resetRankdFilters();
+      return;
+    }
+
+    if (type === "period") {
+      setPeriodFilter(value);
+      return;
+    }
+
+    if (type === "genre") {
+      setGenreFilter(value);
+    }
+  }
 
   function storeActiveUserId(nextUserId) {
     const cleanUserId = nextUserId || null;
@@ -492,12 +672,28 @@ export default function Rankd() {
 
   async function buildShowsForRows(userIdValue, rows, startIndex = 0) {
     const showIds = rows.map((row) => row.show_id).filter(Boolean);
-    const rankingMap = await fetchRankingMap(userIdValue, showIds);
+    const [rankingMap, filterMetadata] = await Promise.all([
+      fetchRankingMap(userIdValue, showIds),
+      fetchShowFilterMetadata(userIdValue, showIds),
+    ]);
 
     return rows
-      .map((row, index) =>
-        normalizeShowRow(row, rankingMap.get(String(row.show_id)), startIndex + index + 1)
-      )
+      .map((row, index) => {
+        const showId = String(row.show_id);
+        const metadata = filterMetadata.showMap.get(showId) || {};
+        return normalizeShowRow(
+          {
+            ...row,
+            shows: {
+              ...(row.shows || {}),
+              ...metadata,
+            },
+            user_rating: filterMetadata.ratingMap.get(showId) ?? null,
+          },
+          rankingMap.get(showId),
+          startIndex + index + 1
+        );
+      })
       .filter((show) => show.show_id && show.show_name)
       .sort(sortByLadder)
       .map((show, index) => ({
@@ -647,6 +843,40 @@ export default function Rankd() {
   useEffect(() => {
     loadCurrentPairStats(currentPair);
   }, [currentPairKey]);
+
+  useEffect(() => {
+    if (isSharedPage || loading || rankFocus) return;
+
+    const regularPairPool = allLeaderboard.filter((show) =>
+      showMatchesRankdFilters(show, activeFilters)
+    );
+
+    if (regularPairPool.length < 2) {
+      setCurrentPair([]);
+      setNotice(
+        filtersActive
+          ? "Not enough shows match these filters. Try widening them."
+          : ""
+      );
+      return;
+    }
+
+    const nextPair = chooseFastPair(
+      regularPairPool,
+      currentPairKey,
+      recentShowIdsRef.current,
+      recentPairKeysRef.current
+    );
+
+    setCurrentPair(nextPair);
+    if (filtersActive) setNotice("");
+  }, [
+    genreFilter,
+    periodFilter,
+    statusFilter,
+    progressFilter,
+    minRatingFilter,
+  ]);
 
   function queueVoteSave({ userIdValue, winner, loser, beforeLadder, updatedLadder }) {
     const now = new Date().toISOString();
@@ -894,8 +1124,14 @@ export default function Rankd() {
     }
 
     if (!nextFocus) {
+      const nextPool = filtersActive
+        ? updatedLadder.filter((show) =>
+            showMatchesRankdFilters(show, activeFilters)
+          )
+        : updatedLadder;
+
       nextPair = chooseFastPair(
-        updatedLadder,
+        nextPool,
         previousPairKey,
         recentShowIdsRef.current,
         [previousPairKey, ...recentPairKeysRef.current]
@@ -1243,6 +1479,142 @@ export default function Rankd() {
               <div>{leaderboard.length} shows</div>
             </div>
 
+            {isLoggedIn ? (
+              <div className="rankd-filter-shell">
+                <div className="rankd-filter-quick-row">
+                  <button
+                    type="button"
+                    className={!filtersActive ? "is-active" : ""}
+                    onClick={() => applyQuickRankdFilter("all")}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className={periodFilter === "this_year" ? "is-active" : ""}
+                    onClick={() => applyQuickRankdFilter("period", "this_year")}
+                  >
+                    This year
+                  </button>
+                  <button
+                    type="button"
+                    className={periodFilter === "decade:2020" ? "is-active" : ""}
+                    onClick={() => applyQuickRankdFilter("period", "decade:2020")}
+                  >
+                    2020s
+                  </button>
+                  {["Comedy", "Crime", "Drama", "Thriller"].map((genre) => (
+                    <button
+                      key={genre}
+                      type="button"
+                      className={genreFilter === genre ? "is-active" : ""}
+                      onClick={() => applyQuickRankdFilter("genre", genre)}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={showFilters ? "is-active" : ""}
+                    onClick={() => setShowFilters((value) => !value)}
+                  >
+                    Filters
+                  </button>
+                </div>
+
+                {showFilters ? (
+                  <div className="rankd-filter-panel">
+                    <label>
+                      <span>Genre</span>
+                      <select
+                        value={genreFilter}
+                        onChange={(event) => setGenreFilter(event.target.value)}
+                      >
+                        <option value="">All genres</option>
+                        {availableGenres.map((genre) => (
+                          <option key={genre} value={genre}>
+                            {genre}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>First aired</span>
+                      <select
+                        value={periodFilter}
+                        onChange={(event) => setPeriodFilter(event.target.value)}
+                      >
+                        <option value="">Any time</option>
+                        <option value="this_year">This year</option>
+                        <option value="decade:2020">2020s</option>
+                        <option value="decade:2010">2010s</option>
+                        <option value="decade:2000">2000s</option>
+                        <option value="decade:1990">1990s</option>
+                        {availableYears.slice(0, 20).map((year) => (
+                          <option key={year} value={`year:${year}`}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Status</span>
+                      <select
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value)}
+                      >
+                        <option value="">Any status</option>
+                        <option value="Continuing">Continuing</option>
+                        <option value="Ended">Ended</option>
+                        <option value="Upcoming">Upcoming</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Progress</span>
+                      <select
+                        value={progressFilter}
+                        onChange={(event) => setProgressFilter(event.target.value)}
+                      >
+                        <option value="">Any progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="watching">Watching</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Your BURGR rating</span>
+                      <select
+                        value={minRatingFilter}
+                        onChange={(event) => setMinRatingFilter(event.target.value)}
+                      >
+                        <option value="">Any rating</option>
+                        <option value="70">70%+</option>
+                        <option value="80">80%+</option>
+                        <option value="90">90%+</option>
+                      </select>
+                    </label>
+
+                    <button
+                      type="button"
+                      className="rankd-filter-clear"
+                      onClick={resetRankdFilters}
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : null}
+
+                {filtersActive ? (
+                  <div className="rankd-filter-summary">
+                    <strong>{leaderboard.length}</strong> of {allLeaderboard.length} Rank'd shows match
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="rankd-leaderboard-list">
               {leaderboard.map((show, index) => (
                 <Link
@@ -1259,7 +1631,9 @@ export default function Rankd() {
 
                   <div>
                     <div className="rankd-leaderboard-title">
-                      #{index + 1} {show.show_name}
+                      {filtersActive
+                        ? `#${index + 1} in filter · #${show.ladder_position} overall ${show.show_name}`
+                        : `#${show.ladder_position} ${show.show_name}`}
                     </div>
                   </div>
 
@@ -1281,7 +1655,7 @@ export default function Rankd() {
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      openMoveModal(show, index + 1);
+                      openMoveModal(show, show.ladder_position || index + 1);
                     }}
                   >
                     Move
@@ -1317,7 +1691,7 @@ export default function Rankd() {
                 <input
                   type="number"
                   min="1"
-                  max={leaderboard.length}
+                  max={allLeaderboard.length}
                   value={moveTargetRank}
                   onChange={(event) => setMoveTargetRank(event.target.value)}
                   placeholder="Rank number"
