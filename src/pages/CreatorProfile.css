@@ -639,3 +639,57 @@
     font-size: 15px;
   }
 }
+
+
+/* Lists tab: flat, full-width presentation like Taste Match. */
+.creator-profile-panel-lists {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.creator-profile-panel-lists .creator-section-head {
+  margin-bottom: 12px;
+}
+
+.creator-profile-panel-lists .creator-list-grid {
+  width: 100%;
+  gap: 14px;
+}
+
+.creator-profile-panel-lists .creator-list-card {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
+}
+
+.creator-profile-panel-lists .creator-list-cover-button {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.creator-profile-panel-lists .creator-list-card + .creator-list-card {
+  padding-top: 2px !important;
+}
+
+.creator-profile-panel-lists .creator-list-expanded-body {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0 0 18px 18px;
+}
+
+.creator-profile-panel-lists .creator-delete-post-btn {
+  width: 100% !important;
+  margin: 10px 0 0 !important;
+}
