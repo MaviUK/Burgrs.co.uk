@@ -364,6 +364,8 @@ export default function CreatorProfile() {
   const [systemStats, setSystemStats] = useState({ shows: 0, episodes: 0 });
   const [tasteMatch, setTasteMatch] = useState(null);
   const [tasteMatchLoading, setTasteMatchLoading] = useState(false);
+  const [tasteSummary, setTasteSummary] = useState(null);
+  const [tasteSummaryLoading, setTasteSummaryLoading] = useState(false);
   const [expandedListIds, setExpandedListIds] = useState(() => new Set());
 
   const isOwnProfile = useMemo(() => {
@@ -462,6 +464,8 @@ export default function CreatorProfile() {
     setRankedTopShows([]);
     setTasteMatch(null);
     setTasteMatchLoading(false);
+    setTasteSummary(null);
+    setTasteSummaryLoading(false);
 
     const [showRows, creatorRows, episodeResult] = await Promise.all([
       fetchAllSystemShows(),
@@ -691,6 +695,46 @@ export default function CreatorProfile() {
     } catch (err) {
       console.warn("Failed loading following:", err);
       setFollowing([]);
+    }
+  }
+
+  async function loadTasteSummary(profileRow, user) {
+    setTasteSummary(null);
+
+    if (!user?.id || !profileRow?.id || String(user.id) === String(profileRow.id)) {
+      setTasteSummaryLoading(false);
+      return;
+    }
+
+    setTasteSummaryLoading(true);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("You must be logged in.");
+
+      const response = await fetch("/.netlify/functions/taste-match-summary", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ targetUserId: profileRow.id }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.error || "Could not calculate show overlap.");
+      }
+
+      setTasteSummary(result?.categories || null);
+    } catch (err) {
+      console.warn("Failed loading Taste Match summary:", err);
+      setTasteSummary(null);
+    } finally {
+      setTasteSummaryLoading(false);
     }
   }
 
@@ -1033,6 +1077,8 @@ export default function CreatorProfile() {
         loadFollowing(profileRow),
         loadRankedTopShows(profileRow),
         loadCreatorLists(profileRow, user),
+        loadTasteMatch(profileRow, user),
+        loadTasteSummary(profileRow, user),
       ]);
 
       const { data: postRows, error: postsError } = await supabase
@@ -1410,117 +1456,65 @@ export default function CreatorProfile() {
       )}
 
       {!isSystemProfile && !isOwnProfile && currentUser?.id ? (
-        <section className="creator-card creator-taste-match" aria-label="Taste Match">
-          <div className="creator-taste-match-head">
-            <div>
-              <span className="creator-taste-eyebrow">Taste Match</span>
-              <h2>How your TV taste compares</h2>
+        <section className="creator-taste-strip" aria-label="Taste Match comparison">
+          {[
+            {
+              key: "total",
+              label: "Total shows",
+              count: tasteSummary?.total?.count,
+              match: tasteSummary?.total?.match,
+            },
+            {
+              key: "completed",
+              label: "Completed",
+              count: tasteSummary?.completed?.count,
+              match: tasteSummary?.completed?.match,
+            },
+            {
+              key: "watching",
+              label: "Watching",
+              count: tasteSummary?.watching?.count,
+              match: tasteSummary?.watching?.match,
+            },
+            {
+              key: "airing",
+              label: "Airing",
+              count: tasteSummary?.airing?.count,
+              match: tasteSummary?.airing?.match,
+            },
+          ].map((item) => (
+            <div key={item.key} className="creator-taste-strip-item">
+              <strong>
+                {tasteSummaryLoading ? "…" : item.count ?? "--"}
+              </strong>
+              <span>{item.label}</span>
+              <small>
+                {tasteSummaryLoading
+                  ? "Comparing"
+                  : item.match == null
+                  ? "No overlap yet"
+                  : `${item.match}% match`}
+              </small>
             </div>
-            {tasteMatchLoading ? (
-              <div className="creator-taste-score is-loading">...</div>
-            ) : tasteMatch?.score != null ? (
-              <div className="creator-taste-score">
-                <strong>{tasteMatch.score}%</strong>
-                <span>{tasteMatch.confidence}</span>
-              </div>
-            ) : (
-              <div className="creator-taste-score is-empty">
-                <strong>--</strong>
-                <span>{tasteMatch?.confidence || "Building your match"}</span>
-              </div>
-            )}
+          ))}
+
+          <div className="creator-taste-strip-item creator-taste-strip-overall">
+            <strong>
+              {tasteMatchLoading
+                ? "…"
+                : tasteMatch?.score == null
+                ? "--"
+                : `${tasteMatch.score}%`}
+            </strong>
+            <span>Taste match</span>
+            <small>
+              {tasteMatchLoading
+                ? "Comparing"
+                : tasteMatch?.score == null
+                ? "Rate more shows"
+                : tasteMatch.confidence}
+            </small>
           </div>
-
-          {tasteMatchLoading ? (
-            <p className="creator-muted">Comparing your ratings and Rank'd lists...</p>
-          ) : tasteMatch ? (
-            <>
-              <div className="creator-taste-metrics">
-                <div>
-                  <strong>{tasteMatch.sharedRatings}</strong>
-                  <span>Shared ratings</span>
-                </div>
-                <div>
-                  <strong>{tasteMatch.ratingSimilarity == null ? "--" : `${tasteMatch.ratingSimilarity}%`}</strong>
-                  <span>Rating similarity</span>
-                </div>
-                <div>
-                  <strong>{tasteMatch.rankSimilarity == null ? "--" : `${tasteMatch.rankSimilarity}%`}</strong>
-                  <span>Rank'd similarity</span>
-                </div>
-                <div>
-                  <strong>{tasteMatch.sharedFavourites}</strong>
-                  <span>Shared favourites</span>
-                </div>
-              </div>
-
-              {tasteMatch.score == null ? (
-                <p className="creator-taste-note">
-                  Rate at least 3 of the same shows to unlock a reliable Taste Match score.
-                </p>
-              ) : null}
-
-              {(tasteMatch.closestAgreement || tasteMatch.biggestDisagreement) ? (
-                <div className="creator-taste-comparisons">
-                  {tasteMatch.closestAgreement ? (
-                    <Link
-                      to={showHref(tasteMatch.closestAgreement.show || { id: tasteMatch.closestAgreement.show_id })}
-                      className="creator-taste-comparison"
-                    >
-                      <span>Closest match</span>
-                      <strong>{tasteMatch.closestAgreement.show?.name || "Shared show"}</strong>
-                      <small>
-                        You {Math.round(tasteMatch.closestAgreement.my_rating)}% • {displayName} {Math.round(tasteMatch.closestAgreement.their_rating)}%
-                      </small>
-                    </Link>
-                  ) : null}
-
-                  {tasteMatch.biggestDisagreement ? (
-                    <Link
-                      to={showHref(tasteMatch.biggestDisagreement.show || { id: tasteMatch.biggestDisagreement.show_id })}
-                      className="creator-taste-comparison"
-                    >
-                      <span>Biggest disagreement</span>
-                      <strong>{tasteMatch.biggestDisagreement.show?.name || "Shared show"}</strong>
-                      <small>
-                        You {Math.round(tasteMatch.biggestDisagreement.my_rating)}% • {displayName} {Math.round(tasteMatch.biggestDisagreement.their_rating)}%
-                      </small>
-                    </Link>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {tasteMatch.recommendations.length ? (
-                <div className="creator-taste-recommendations">
-                  <div className="creator-section-head">
-                    <h3>From {displayName}'s favourites</h3>
-                    <span>Shows you haven't rated yet</span>
-                  </div>
-                  <div className="creator-taste-recommendation-grid">
-                    {tasteMatch.recommendations.map((item) => (
-                      <Link
-                        key={item.show_id}
-                        to={showHref(item.show || { id: item.show_id })}
-                        className="creator-taste-recommendation"
-                      >
-                        {item.show?.poster_url ? (
-                          <img src={item.show.poster_url} alt="" loading="lazy" />
-                        ) : (
-                          <span className="creator-taste-poster-fallback">?</span>
-                        )}
-                        <div>
-                          <strong>{item.show?.name || "Show"}</strong>
-                          <span>{displayName} rated it {Math.round(item.their_rating)}%</span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <p className="creator-muted">Taste Match is unavailable for this profile right now.</p>
-          )}
         </section>
       ) : null}
 
