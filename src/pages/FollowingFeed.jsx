@@ -844,14 +844,8 @@ export default function FollowingFeed() {
     <main className="following-page">
       <section className="following-taste-matches" aria-label="Your closest Taste Matches">
         <div className="following-taste-head">
-          <div>
-            <span>Taste Match</span>
-            <h2>Your closest matches</h2>
-          </div>
-          <div className="following-taste-head-actions">
-            <small>Based on ratings, Rank'd and your show libraries</small>
-            <Link to="/taste-match">View all</Link>
-          </div>
+          <span>Taste Match</span>
+          <Link to="/taste-match">View all</Link>
         </div>
 
         {tasteMatchesLoading ? (
