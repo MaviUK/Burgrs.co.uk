@@ -663,3 +663,39 @@
     margin-right: -2px;
   }
 }
+
+
+.rankd-genre-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+}
+
+.rankd-genre-picker > span {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.rankd-genre-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.rankd-genre-grid button {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  padding: 7px 10px;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.rankd-genre-grid button.is-active {
+  border-color: rgba(249, 168, 212, 0.34);
+  background: rgba(151, 7, 71, 0.2);
+  color: #fff;
+}
