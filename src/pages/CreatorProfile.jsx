@@ -362,6 +362,8 @@ export default function CreatorProfile() {
   const [lists, setLists] = useState([]);
   const [rankedTopShows, setRankedTopShows] = useState([]);
   const [systemStats, setSystemStats] = useState({ shows: 0, episodes: 0 });
+  const [tasteMatch, setTasteMatch] = useState(null);
+  const [tasteMatchLoading, setTasteMatchLoading] = useState(false);
   const [expandedListIds, setExpandedListIds] = useState(() => new Set());
 
   const isOwnProfile = useMemo(() => {
@@ -458,6 +460,8 @@ export default function CreatorProfile() {
     setPosts([]);
     setReviews([]);
     setRankedTopShows([]);
+    setTasteMatch(null);
+    setTasteMatchLoading(false);
 
     const [showRows, creatorRows, episodeResult] = await Promise.all([
       fetchAllSystemShows(),
@@ -687,6 +691,235 @@ export default function CreatorProfile() {
     } catch (err) {
       console.warn("Failed loading following:", err);
       setFollowing([]);
+    }
+  }
+
+  async function loadTasteMatch(profileRow, user) {
+    setTasteMatch(null);
+
+    if (!user?.id || !profileRow?.id || String(user.id) === String(profileRow.id)) {
+      setTasteMatchLoading(false);
+      return;
+    }
+
+    setTasteMatchLoading(true);
+
+    try {
+      const [
+        myRatingsResult,
+        theirRatingsResult,
+        myRankingsResult,
+        theirRankingsResult,
+      ] = await Promise.all([
+        supabase
+          .from("burgr_ratings")
+          .select("show_id, rating")
+          .eq("user_id", user.id),
+        supabase
+          .from("burgr_ratings")
+          .select("show_id, rating")
+          .eq("user_id", profileRow.id),
+        supabase
+          .from("user_show_rankings")
+          .select("show_id, ladder_position")
+          .eq("user_id", user.id)
+          .not("ladder_position", "is", null)
+          .order("ladder_position", { ascending: true }),
+        supabase
+          .from("user_show_rankings")
+          .select("show_id, ladder_position")
+          .eq("user_id", profileRow.id)
+          .not("ladder_position", "is", null)
+          .order("ladder_position", { ascending: true }),
+      ]);
+
+      if (myRatingsResult.error) throw myRatingsResult.error;
+      if (theirRatingsResult.error) throw theirRatingsResult.error;
+      if (myRankingsResult.error) throw myRankingsResult.error;
+      if (theirRankingsResult.error) throw theirRankingsResult.error;
+
+      const myRatings = new Map(
+        (myRatingsResult.data || []).map((row) => [String(row.show_id), Number(row.rating)])
+      );
+      const theirRatings = new Map(
+        (theirRatingsResult.data || []).map((row) => [String(row.show_id), Number(row.rating)])
+      );
+
+      const sharedRatings = [];
+      myRatings.forEach((myRating, showId) => {
+        const theirRating = theirRatings.get(showId);
+        if (!Number.isFinite(myRating) || !Number.isFinite(theirRating)) return;
+        sharedRatings.push({
+          show_id: showId,
+          my_rating: myRating,
+          their_rating: theirRating,
+          difference: Math.abs(myRating - theirRating),
+          average: (myRating + theirRating) / 2,
+        });
+      });
+
+      const ratingSimilarity = sharedRatings.length
+        ? sharedRatings.reduce(
+            (sum, item) => sum + Math.max(0, 100 - item.difference),
+            0
+          ) / sharedRatings.length
+        : null;
+
+      const myRankings = myRankingsResult.data || [];
+      const theirRankings = theirRankingsResult.data || [];
+      const myRankMap = new Map(
+        myRankings.map((row, index) => [
+          String(row.show_id),
+          {
+            position: Number(row.ladder_position) || index + 1,
+            percentile:
+              myRankings.length <= 1
+                ? 0
+                : index / Math.max(1, myRankings.length - 1),
+          },
+        ])
+      );
+      const theirRankMap = new Map(
+        theirRankings.map((row, index) => [
+          String(row.show_id),
+          {
+            position: Number(row.ladder_position) || index + 1,
+            percentile:
+              theirRankings.length <= 1
+                ? 0
+                : index / Math.max(1, theirRankings.length - 1),
+          },
+        ])
+      );
+
+      const sharedRanked = [];
+      myRankMap.forEach((myRank, showId) => {
+        const theirRank = theirRankMap.get(showId);
+        if (!theirRank) return;
+        sharedRanked.push({
+          show_id: showId,
+          similarity: Math.max(
+            0,
+            100 - Math.abs(myRank.percentile - theirRank.percentile) * 100
+          ),
+        });
+      });
+
+      const rankSimilarity =
+        sharedRanked.length >= 2
+          ? sharedRanked.reduce((sum, item) => sum + item.similarity, 0) /
+            sharedRanked.length
+          : null;
+
+      const myFavourites = new Set(
+        [...myRatings.entries()]
+          .filter(([, rating]) => rating >= 80)
+          .map(([showId]) => showId)
+      );
+      const theirFavourites = new Set(
+        [...theirRatings.entries()]
+          .filter(([, rating]) => rating >= 80)
+          .map(([showId]) => showId)
+      );
+      const sharedFavouriteIds = [...myFavourites].filter((showId) =>
+        theirFavourites.has(showId)
+      );
+      const favouriteBase = Math.min(myFavourites.size, theirFavourites.size);
+      const favouriteSimilarity = favouriteBase
+        ? (sharedFavouriteIds.length / favouriteBase) * 100
+        : null;
+
+      const components = [];
+      if (ratingSimilarity != null) components.push({ value: ratingSimilarity, weight: 70 });
+      if (rankSimilarity != null) components.push({ value: rankSimilarity, weight: 20 });
+      if (favouriteSimilarity != null) {
+        components.push({ value: favouriteSimilarity, weight: 10 });
+      }
+
+      const weightedScore = components.length
+        ? components.reduce((sum, item) => sum + item.value * item.weight, 0) /
+          components.reduce((sum, item) => sum + item.weight, 0)
+        : null;
+
+      const score = sharedRatings.length >= 3 && weightedScore != null
+        ? Math.round(weightedScore)
+        : null;
+
+      const confidence =
+        sharedRatings.length >= 20
+          ? "High confidence"
+          : sharedRatings.length >= 10
+          ? "Good confidence"
+          : sharedRatings.length >= 5
+          ? "Growing confidence"
+          : sharedRatings.length >= 3
+          ? "Early match"
+          : "Not enough shared ratings";
+
+      const closestAgreement = sharedRatings.length
+        ? [...sharedRatings].sort(
+            (a, b) => a.difference - b.difference || b.average - a.average
+          )[0]
+        : null;
+      const biggestDisagreement = sharedRatings.length
+        ? [...sharedRatings].sort(
+            (a, b) => b.difference - a.difference || b.average - a.average
+          )[0]
+        : null;
+
+      const recommendationCandidates = [...theirRatings.entries()]
+        .filter(([showId, rating]) => rating >= 80 && !myRatings.has(showId))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([showId, rating]) => ({ show_id: showId, their_rating: rating }));
+
+      const detailIds = Array.from(
+        new Set(
+          [
+            closestAgreement?.show_id,
+            biggestDisagreement?.show_id,
+            ...recommendationCandidates.map((item) => item.show_id),
+          ].filter(Boolean)
+        )
+      );
+
+      let showMap = new Map();
+      if (detailIds.length) {
+        const { data: showRows, error: showError } = await supabase
+          .from("shows")
+          .select("id, name, first_aired, poster_url, tmdb_id")
+          .in("id", detailIds);
+
+        if (showError) throw showError;
+        showMap = new Map((showRows || []).map((show) => [String(show.id), show]));
+      }
+
+      const addShow = (item) => {
+        if (!item) return null;
+        return {
+          ...item,
+          show: showMap.get(String(item.show_id)) || null,
+        };
+      };
+
+      setTasteMatch({
+        score,
+        confidence,
+        sharedRatings: sharedRatings.length,
+        sharedRanked: sharedRanked.length,
+        sharedFavourites: sharedFavouriteIds.length,
+        ratingSimilarity:
+          ratingSimilarity == null ? null : Math.round(ratingSimilarity),
+        rankSimilarity: rankSimilarity == null ? null : Math.round(rankSimilarity),
+        closestAgreement: addShow(closestAgreement),
+        biggestDisagreement: addShow(biggestDisagreement),
+        recommendations: recommendationCandidates.map(addShow),
+      });
+    } catch (err) {
+      console.warn("Failed loading Taste Match:", err);
+      setTasteMatch(null);
+    } finally {
+      setTasteMatchLoading(false);
     }
   }
 
@@ -1175,6 +1408,121 @@ export default function CreatorProfile() {
           </button>
         </section>
       )}
+
+      {!isSystemProfile && !isOwnProfile && currentUser?.id ? (
+        <section className="creator-card creator-taste-match" aria-label="Taste Match">
+          <div className="creator-taste-match-head">
+            <div>
+              <span className="creator-taste-eyebrow">Taste Match</span>
+              <h2>How your TV taste compares</h2>
+            </div>
+            {tasteMatchLoading ? (
+              <div className="creator-taste-score is-loading">...</div>
+            ) : tasteMatch?.score != null ? (
+              <div className="creator-taste-score">
+                <strong>{tasteMatch.score}%</strong>
+                <span>{tasteMatch.confidence}</span>
+              </div>
+            ) : (
+              <div className="creator-taste-score is-empty">
+                <strong>--</strong>
+                <span>{tasteMatch?.confidence || "Building your match"}</span>
+              </div>
+            )}
+          </div>
+
+          {tasteMatchLoading ? (
+            <p className="creator-muted">Comparing your ratings and Rank'd lists...</p>
+          ) : tasteMatch ? (
+            <>
+              <div className="creator-taste-metrics">
+                <div>
+                  <strong>{tasteMatch.sharedRatings}</strong>
+                  <span>Shared ratings</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.ratingSimilarity == null ? "--" : `${tasteMatch.ratingSimilarity}%`}</strong>
+                  <span>Rating similarity</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.rankSimilarity == null ? "--" : `${tasteMatch.rankSimilarity}%`}</strong>
+                  <span>Rank'd similarity</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.sharedFavourites}</strong>
+                  <span>Shared favourites</span>
+                </div>
+              </div>
+
+              {tasteMatch.score == null ? (
+                <p className="creator-taste-note">
+                  Rate at least 3 of the same shows to unlock a reliable Taste Match score.
+                </p>
+              ) : null}
+
+              {(tasteMatch.closestAgreement || tasteMatch.biggestDisagreement) ? (
+                <div className="creator-taste-comparisons">
+                  {tasteMatch.closestAgreement ? (
+                    <Link
+                      to={showHref(tasteMatch.closestAgreement.show || { id: tasteMatch.closestAgreement.show_id })}
+                      className="creator-taste-comparison"
+                    >
+                      <span>Closest match</span>
+                      <strong>{tasteMatch.closestAgreement.show?.name || "Shared show"}</strong>
+                      <small>
+                        You {Math.round(tasteMatch.closestAgreement.my_rating)}% • {displayName} {Math.round(tasteMatch.closestAgreement.their_rating)}%
+                      </small>
+                    </Link>
+                  ) : null}
+
+                  {tasteMatch.biggestDisagreement ? (
+                    <Link
+                      to={showHref(tasteMatch.biggestDisagreement.show || { id: tasteMatch.biggestDisagreement.show_id })}
+                      className="creator-taste-comparison"
+                    >
+                      <span>Biggest disagreement</span>
+                      <strong>{tasteMatch.biggestDisagreement.show?.name || "Shared show"}</strong>
+                      <small>
+                        You {Math.round(tasteMatch.biggestDisagreement.my_rating)}% • {displayName} {Math.round(tasteMatch.biggestDisagreement.their_rating)}%
+                      </small>
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {tasteMatch.recommendations.length ? (
+                <div className="creator-taste-recommendations">
+                  <div className="creator-section-head">
+                    <h3>From {displayName}'s favourites</h3>
+                    <span>Shows you haven't rated yet</span>
+                  </div>
+                  <div className="creator-taste-recommendation-grid">
+                    {tasteMatch.recommendations.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-recommendation"
+                      >
+                        {item.show?.poster_url ? (
+                          <img src={item.show.poster_url} alt="" loading="lazy" />
+                        ) : (
+                          <span className="creator-taste-poster-fallback">?</span>
+                        )}
+                        <div>
+                          <strong>{item.show?.name || "Show"}</strong>
+                          <span>{displayName} rated it {Math.round(item.their_rating)}%</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="creator-muted">Taste Match is unavailable for this profile right now.</p>
+          )}
+        </section>
+      ) : null}
 
       {creatorBio ? (
         <section className="creator-card">
