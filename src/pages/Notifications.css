@@ -329,3 +329,18 @@
     height: 44px;
   }
 }
+
+
+.notification-icon.is-show-artwork {
+  height: 68px;
+  border-radius: 10px;
+  background: #111827;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
+}
+
+.notification-show-poster {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
