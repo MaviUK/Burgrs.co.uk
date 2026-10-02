@@ -1015,7 +1015,7 @@ function NewsCard({ story, featured = false, compact = false }) {
   return <div className={className}>{card}</div>;
 }
 
-function ForYouCard({ show, onDismiss, onAdd, isAdding }) {
+function ForYouCard({ show, onFeedback, onAdd, isAdding, savingFeedback }) {
   const href = show.tmdb_id
     ? `/show/tmdb/${show.tmdb_id}`
     : show.tvdb_id
@@ -1037,15 +1037,35 @@ function ForYouCard({ show, onDismiss, onAdd, isAdding }) {
           type="button"
           className="for-you-add"
           onClick={() => onAdd?.(show)}
-          disabled={isAdding}
+          disabled={isAdding || savingFeedback}
         >
           {isAdding ? "Adding..." : "Add to My Shows"}
         </button>
+        <div className="for-you-feedback-row">
+          <button
+            type="button"
+            className="for-you-feedback"
+            onClick={() => onFeedback?.(show, "more_like")}
+            disabled={isAdding || savingFeedback}
+            aria-label={`Recommend more shows like ${show.name || "this show"}`}
+          >
+            More like this
+          </button>
+          <button
+            type="button"
+            className="for-you-feedback"
+            onClick={() => onFeedback?.(show, "less_like")}
+            disabled={isAdding || savingFeedback}
+            aria-label={`Recommend fewer shows like ${show.name || "this show"}`}
+          >
+            Less like this
+          </button>
+        </div>
         <button
           type="button"
           className="for-you-dismiss"
-          onClick={() => onDismiss?.(show)}
-          disabled={isAdding}
+          onClick={() => onFeedback?.(show, "not_interested")}
+          disabled={isAdding || savingFeedback}
           aria-label={`Don't recommend ${show.name || "this show"} again`}
         >
           Not for me
@@ -1093,6 +1113,7 @@ export default function Dashboard() {
   const [dashboardView, setDashboardView] = useState(() => makeEmptyDashboardView());
   const [loading, setLoading] = useState(true);
   const [addingForYouId, setAddingForYouId] = useState("");
+  const [savingFeedbackId, setSavingFeedbackId] = useState("");
 
   async function addRecommendationToMyShows(show) {
     const showId = String(show?.show_id || show?.id || "");
@@ -1110,6 +1131,23 @@ export default function Dashboard() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (user?.id && savedShow?.id) {
+        const { error: feedbackError } = await supabase
+          .from("recommendation_feedback")
+          .upsert(
+            {
+              user_id: user.id,
+              show_id: savedShow.id,
+              feedback_type: "added",
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,show_id" }
+          );
+        if (feedbackError) {
+          console.warn("Could not record For You add feedback:", feedbackError);
+        }
+      }
 
       setDashboardView((current) => {
         const next = {
@@ -1153,18 +1191,23 @@ export default function Dashboard() {
     }
   }
 
-  async function dismissRecommendation(show) {
-    const showId = show?.show_id || show?.id;
-    if (!showId) return;
+  async function saveRecommendationFeedback(show, feedbackType) {
+    const showId = String(show?.show_id || show?.id || "");
+    if (!showId || savingFeedbackId) return;
 
+    setSavingFeedbackId(showId);
     const previousForYou = dashboardView.forYou || [];
+    const removeNow =
+      feedbackType === "not_interested" || feedbackType === "less_like";
 
-    setDashboardView((current) => ({
-      ...current,
-      forYou: (current.forYou || []).filter(
-        (item) => String(item.show_id || item.id) !== String(showId)
-      ),
-    }));
+    if (removeNow) {
+      setDashboardView((current) => ({
+        ...current,
+        forYou: (current.forYou || []).filter(
+          (item) => String(item.show_id || item.id) !== showId
+        ),
+      }));
+    }
 
     try {
       const {
@@ -1181,27 +1224,33 @@ export default function Dashboard() {
           {
             user_id: user.id,
             show_id: showId,
-            feedback_type: "not_interested",
+            feedback_type: feedbackType,
+            updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,show_id" }
         );
 
       if (error) throw error;
 
-      const nextView = {
-        ...dashboardView,
-        forYou: previousForYou.filter(
-          (item) => String(item.show_id || item.id) !== String(showId)
-        ),
-      };
-
-      writeDashboardCache(user.id, nextView);
+      const refreshed = await fetchForYouRecommendations();
+      setDashboardView((current) => {
+        const next = {
+          ...current,
+          forYou: refreshed,
+        };
+        writeDashboardCache(user.id, next);
+        return next;
+      });
     } catch (error) {
       console.warn("Failed saving recommendation feedback:", error);
-      setDashboardView((current) => ({
-        ...current,
-        forYou: previousForYou,
-      }));
+      if (removeNow) {
+        setDashboardView((current) => ({
+          ...current,
+          forYou: previousForYou,
+        }));
+      }
+    } finally {
+      setSavingFeedbackId("");
     }
   }
 
@@ -1481,9 +1530,10 @@ export default function Dashboard() {
               <ForYouCard
                 key={`for-you-${show.show_id}`}
                 show={show}
-                onDismiss={dismissRecommendation}
+                onFeedback={saveRecommendationFeedback}
                 onAdd={addRecommendationToMyShows}
                 isAdding={addingForYouId === String(show.show_id || show.id || "")}
+                savingFeedback={savingFeedbackId === String(show.show_id || show.id || "")}
               />
             ))}
           </div>
