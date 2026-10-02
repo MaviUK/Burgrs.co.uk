@@ -4,6 +4,8 @@ import { useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import "./ProfileBlockButton.css";
 
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
+
 function getName(profile) {
   return (
     profile?.display_name ||
@@ -11,6 +13,15 @@ function getName(profile) {
     profile?.username ||
     "this user"
   );
+}
+
+function isProtectedBurgrsTvProfile(profile) {
+  if (!profile) return false;
+  if (String(profile.id || "") === BURGRS_TV_PROFILE_ID) return true;
+
+  return [profile.username, profile.display_name, profile.full_name]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .includes("burgrs tv");
 }
 
 function isUuid(value) {
@@ -233,7 +244,8 @@ export default function ProfileBlockButton() {
     !profile?.id ||
     !currentUserId ||
     currentUserId === profile.id ||
-    blockedByThem
+    blockedByThem ||
+    isProtectedBurgrsTvProfile(profile)
   ) {
     return null;
   }
