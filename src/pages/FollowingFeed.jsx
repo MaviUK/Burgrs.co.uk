@@ -848,7 +848,10 @@ export default function FollowingFeed() {
             <span>Taste Match</span>
             <h2>Your closest matches</h2>
           </div>
-          <small>Based on ratings, Rank'd and your show libraries</small>
+          <div className="following-taste-head-actions">
+            <small>Based on ratings, Rank'd and your show libraries</small>
+            <Link to="/taste-match">View all</Link>
+          </div>
         </div>
 
         {tasteMatchesLoading ? (
