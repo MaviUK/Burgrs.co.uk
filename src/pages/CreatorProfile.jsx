@@ -398,6 +398,49 @@ export default function CreatorProfile() {
     );
   }, [isOwnProfile, monetization]);
 
+  const libraryTasteScore = useMemo(() => {
+    if (!tasteSummary) return null;
+
+    const candidates = [
+      { data: tasteSummary.total, weight: 45 },
+      { data: tasteSummary.completed, weight: 30 },
+      { data: tasteSummary.airing, weight: 20 },
+      {
+        data: tasteSummary.watching,
+        weight: 5,
+        minimumCombinedShows: 4,
+      },
+    ].filter(({ data, minimumCombinedShows = 0 }) => {
+      if (!Number.isFinite(Number(data?.match))) return false;
+      const combinedShows =
+        Number(data?.count || 0) + Number(data?.viewerCount || 0);
+      return combinedShows >= minimumCombinedShows;
+    });
+
+    if (!candidates.length) return null;
+
+    const weightedTotal = candidates.reduce(
+      (sum, item) => sum + Number(item.data.match) * item.weight,
+      0
+    );
+    const totalWeight = candidates.reduce((sum, item) => sum + item.weight, 0);
+
+    return totalWeight ? Math.round(weightedTotal / totalWeight) : null;
+  }, [tasteSummary]);
+
+  const displayedTasteScore =
+    tasteMatch?.score != null ? tasteMatch.score : libraryTasteScore;
+
+  const tasteScoreIsProvisional =
+    tasteMatch?.score == null && libraryTasteScore != null;
+
+  const displayedTasteConfidence =
+    tasteMatch?.score != null
+      ? tasteMatch.confidence
+      : libraryTasteScore != null
+      ? "Library-based"
+      : "Building your match";
+
   function getStatButtonClass(sectionName) {
     return activeProfilePanel === sectionName ? "is-active" : "";
   }
@@ -1731,17 +1774,17 @@ export default function CreatorProfile() {
             <strong>
               {tasteMatchLoading
                 ? "…"
-                : tasteMatch?.score == null
+                : displayedTasteScore == null
                 ? "--"
-                : `${tasteMatch.score}%`}
+                : `${displayedTasteScore}%`}
             </strong>
             <span>Taste match</span>
             <small>
               {tasteMatchLoading
                 ? "Comparing"
-                : tasteMatch?.score == null
-                ? "Rate more shows"
-                : tasteMatch.confidence}
+                : displayedTasteScore == null
+                ? "Building match"
+                : displayedTasteConfidence}
             </small>
           </button>
         </section>
@@ -1757,9 +1800,9 @@ export default function CreatorProfile() {
                 Ratings drive the score, with Rank'd order and shared favourites refining the match.
               </p>
             </div>
-            <div className={`creator-taste-score${tasteMatch?.score == null ? " is-empty" : ""}`}>
-              <strong>{tasteMatch?.score == null ? "--" : `${tasteMatch.score}%`}</strong>
-              <span>{tasteMatch?.confidence || "Building your match"}</span>
+            <div className={`creator-taste-score${displayedTasteScore == null ? " is-empty" : ""}`}>
+              <strong>{displayedTasteScore == null ? "--" : `${displayedTasteScore}%`}</strong>
+              <span>{displayedTasteConfidence}</span>
             </div>
           </div>
 
@@ -1955,9 +1998,13 @@ export default function CreatorProfile() {
                 </div>
               ) : null}
 
-              {tasteMatch.score == null ? (
+              {tasteScoreIsProvisional ? (
                 <p className="creator-taste-note">
-                  Rate at least 3 of the same shows to unlock the overall Taste Match percentage.
+                  This is a provisional Taste Match based on your show libraries. Once you have rated at least 3 of the same shows, BURGRS will switch to the stronger ratings + Rank'd score.
+                </p>
+              ) : displayedTasteScore == null ? (
+                <p className="creator-taste-note">
+                  Add and rate more shows to build your Taste Match.
                 </p>
               ) : null}
             </>
