@@ -6,6 +6,7 @@ import "./CreatorListCards.css";
 import "./CreatorProfileStats.css";
 
 const SYSTEM_ADMIN_USERNAME = "burgrs";
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
 const SYSTEM_ADMIN_ALIASES = new Set([SYSTEM_ADMIN_USERNAME, "admin"]);
 const SYSTEM_ADMIN_PROFILE = Object.freeze({
   id: "burgrs-system-admin",
@@ -24,6 +25,21 @@ const SYSTEM_SHOW_PAGE_SIZE = 500;
 
 function isSystemAdminSlug(value) {
   return SYSTEM_ADMIN_ALIASES.has(String(value || "").trim().toLowerCase());
+}
+
+function isProtectedBurgrsTvProfile(profile) {
+  if (!profile) return false;
+  if (String(profile.id || "") === BURGRS_TV_PROFILE_ID) return true;
+
+  const names = [
+    profile.username,
+    profile.display_name,
+    profile.full_name,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  return names.includes("burgrs tv");
 }
 
 function getName(profile) {
@@ -1481,7 +1497,15 @@ export default function CreatorProfile() {
   }
 
   async function toggleFollow() {
-    if (!currentUser?.id || !profile?.id || isOwnProfile || followLoading) return;
+    if (
+      !currentUser?.id ||
+      !profile?.id ||
+      isOwnProfile ||
+      followLoading ||
+      isProtectedBurgrsTvProfile(profile)
+    ) {
+      return;
+    }
     setFollowLoading(true);
     setError("");
 
@@ -1531,6 +1555,7 @@ export default function CreatorProfile() {
   }
 
   const isSystemProfile = Boolean(profile?.is_system_profile);
+  const isProtectedBurgrsTv = isProtectedBurgrsTvProfile(profile);
   const displayName = getName(profile);
   const handle = profile?.username ? `@${profile.username}` : "";
   const avatarUrl = profile?.avatar_url || "";
@@ -1585,6 +1610,15 @@ export default function CreatorProfile() {
                   Create list
                 </Link>
               </>
+            ) : isProtectedBurgrsTv ? (
+              <button
+                type="button"
+                className="creator-btn creator-btn-secondary"
+                disabled
+                aria-label="Burgrs TV is always followed"
+              >
+                Following
+              </button>
             ) : (
               <button
                 type="button"
