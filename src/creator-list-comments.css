@@ -345,3 +345,100 @@
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
+
+
+/* Creator profile list actions: keep all actions inside the artwork. */
+.creator-profile-panel-lists .creator-list-card-collapsed {
+  --creator-list-cover-height: 172px;
+  position: relative;
+}
+
+.creator-profile-panel-lists .creator-list-card-collapsed.is-expanded {
+  --creator-list-cover-height: 136px;
+}
+
+.creator-profile-panel-lists .creator-list-actions-row {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  z-index: 5 !important;
+  min-height: 52px !important;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto) minmax(0, 1fr) !important;
+  gap: 8px !important;
+  margin-top: -52px !important;
+  padding: 14px 18px 10px !important;
+  background: linear-gradient(
+    180deg,
+    rgba(2, 6, 23, 0) 0%,
+    rgba(2, 6, 23, 0.68) 38%,
+    rgba(2, 6, 23, 0.94) 100%
+  ) !important;
+  pointer-events: none;
+}
+
+.creator-profile-panel-lists .creator-list-actions-row .burgrs-activity-share-btn {
+  grid-column: 1 !important;
+  justify-self: start !important;
+  align-self: end !important;
+  color: #f9a8d4 !important;
+  pointer-events: auto;
+}
+
+.creator-profile-panel-lists .creator-list-comments-toggle {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  align-self: end !important;
+  color: #f9a8d4 !important;
+  pointer-events: auto;
+}
+
+.creator-profile-panel-lists .creator-list-card-collapsed > .creator-delete-post-btn {
+  position: absolute !important;
+  z-index: 6 !important;
+  top: calc(var(--creator-list-cover-height) - 41px) !important;
+  left: 50% !important;
+  width: auto !important;
+  min-width: 92px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 6px 12px !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(249, 168, 212, 0.26) !important;
+  border-radius: 999px !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #f9a8d4 !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  backdrop-filter: blur(8px);
+}
+
+.creator-profile-panel-lists .creator-list-card-collapsed > .creator-delete-post-btn:hover,
+.creator-profile-panel-lists .creator-list-card-collapsed > .creator-delete-post-btn:focus-visible {
+  background: rgba(151, 7, 71, 0.72) !important;
+  color: #ffffff !important;
+  outline: none !important;
+}
+
+.creator-profile-panel-lists .creator-list-expanded-body,
+.creator-profile-panel-lists .creator-list-comments-panel {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 380px) {
+  .creator-profile-panel-lists .creator-list-actions-row {
+    grid-template-columns: minmax(0, 1fr) minmax(82px, auto) minmax(0, 1fr) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .creator-profile-panel-lists .creator-list-card-collapsed > .creator-delete-post-btn {
+    min-width: 80px !important;
+    padding-left: 9px !important;
+    padding-right: 9px !important;
+    font-size: 10px !important;
+  }
+}
