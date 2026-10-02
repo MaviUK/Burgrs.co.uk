@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import NotificationPreferences from "../components/NotificationPreferences";
+import RecommendationHistory from "../components/RecommendationHistory";
 
 function normalizeUrl(value) {
   const trimmed = (value || "").trim();
@@ -586,6 +587,7 @@ export default function ProfileEditMerged() {
         </section>
 
         <NotificationPreferences sectionStyle={sectionStyle} />
+        <RecommendationHistory sectionStyle={sectionStyle} />
 
         <section style={sectionStyle}>
           <h2 style={{ margin: "0 0 14px", color: "#f8fafc" }}>Links</h2>
