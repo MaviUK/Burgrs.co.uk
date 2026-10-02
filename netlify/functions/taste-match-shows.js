@@ -118,15 +118,27 @@ export async function handler(event) {
       return jsonResponse(400, { error: "Invalid profile." });
     }
 
-    if (!["total", "completed", "watching", "airing"].includes(category)) {
+    if (
+      ![
+        "total",
+        "completed",
+        "watching",
+        "airing",
+        "mutual",
+        "both_completed",
+        "both_watching",
+        "only_them",
+        "only_me",
+      ].includes(category)
+    ) {
       return jsonResponse(400, { error: "Invalid show filter." });
     }
 
-    await verifyUser({ supabaseUrl, anonKey, accessToken });
+    const viewer = await verifyUser({ supabaseUrl, anonKey, accessToken });
 
     const userShowParams = new URLSearchParams({
-      select: "show_id,watch_status,added_at",
-      user_id: `eq.${targetUserId}`,
+      select: "user_id,show_id,watch_status,added_at",
+      user_id: `in.(${viewer.id},${targetUserId})`,
       archived_at: "is.null",
     });
 
@@ -137,12 +149,60 @@ export async function handler(event) {
       params: userShowParams,
     });
 
-    const relevantUserShows = userShows.filter((row) => {
-      const watchStatus = String(row?.watch_status || "").toLowerCase();
-      if (category === "completed") return watchStatus === "completed";
-      if (category === "watching") return watchStatus === "watching";
-      return true;
-    });
+    const viewerRows = userShows.filter(
+      (row) => String(row.user_id) === String(viewer.id)
+    );
+    const targetRows = userShows.filter(
+      (row) => String(row.user_id) === String(targetUserId)
+    );
+
+    const viewerMap = new Map(
+      viewerRows.map((row) => [String(row.show_id), row])
+    );
+    const targetMap = new Map(
+      targetRows.map((row) => [String(row.show_id), row])
+    );
+
+    let relevantUserShows;
+
+    if (category === "mutual") {
+      relevantUserShows = targetRows.filter((row) =>
+        viewerMap.has(String(row.show_id))
+      );
+    } else if (category === "both_completed") {
+      relevantUserShows = targetRows.filter((row) => {
+        const mine = viewerMap.get(String(row.show_id));
+        return (
+          mine &&
+          String(mine.watch_status || "").toLowerCase() === "completed" &&
+          String(row.watch_status || "").toLowerCase() === "completed"
+        );
+      });
+    } else if (category === "both_watching") {
+      relevantUserShows = targetRows.filter((row) => {
+        const mine = viewerMap.get(String(row.show_id));
+        return (
+          mine &&
+          String(mine.watch_status || "").toLowerCase() === "watching" &&
+          String(row.watch_status || "").toLowerCase() === "watching"
+        );
+      });
+    } else if (category === "only_them") {
+      relevantUserShows = targetRows.filter(
+        (row) => !viewerMap.has(String(row.show_id))
+      );
+    } else if (category === "only_me") {
+      relevantUserShows = viewerRows.filter(
+        (row) => !targetMap.has(String(row.show_id))
+      );
+    } else {
+      relevantUserShows = targetRows.filter((row) => {
+        const watchStatus = String(row?.watch_status || "").toLowerCase();
+        if (category === "completed") return watchStatus === "completed";
+        if (category === "watching") return watchStatus === "watching";
+        return true;
+      });
+    }
 
     const showIds = Array.from(
       new Set(relevantUserShows.map((row) => row.show_id).filter(Boolean).map(String))
