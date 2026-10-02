@@ -1132,7 +1132,8 @@
   font-weight: 950;
 }
 
-.for-you-card > strong {
+.for-you-card > strong,
+.for-you-card-link > strong {
   display: -webkit-box;
   overflow: hidden;
   margin-top: 7px;
