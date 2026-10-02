@@ -31,6 +31,7 @@ const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const ActorPage = lazy(() => import("./pages/ActorPage"));
 const Rankd = lazy(() => import("./pages/Rankd"));
 const StreamingProvider = lazy(() => import("./pages/StreamingProvider"));
+const TasteMatchDiscovery = lazy(() => import("./pages/TasteMatchDiscovery"));
 
 const HEADER_PROFILE_CACHE_PREFIX = "burgrs-header-profile:";
 
@@ -523,6 +524,7 @@ function AppLayout() {
           <Route path="/my-shows/tmdb/:tmdbId" element={<ProtectedRoute session={session}><MyShowDetails /></ProtectedRoute>} />
           <Route path="/actor/:name" element={<ProtectedRoute session={session}><ActorPage /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute session={session}><CalendarPage /></ProtectedRoute>} />
+          <Route path="/taste-match" element={<ProtectedRoute session={session}><TasteMatchDiscovery /></ProtectedRoute>} />
           <Route path="/profile/edit" element={<ProtectedRoute session={session}><ProfileEditMerged /></ProtectedRoute>} />
           <Route path="/rankd" element={<ProtectedRoute session={session}><Rankd /></ProtectedRoute>} />
           <Route path="/rankd/share/:slug" element={<Rankd />} />
