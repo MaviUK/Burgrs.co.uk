@@ -10,6 +10,7 @@ const DEFAULTS = {
   airing_today: true,
   new_season: true,
   season_premiere_date: true,
+  for_you_recommendations: true,
 };
 
 const GROUPS = [
@@ -29,6 +30,7 @@ const GROUPS = [
       ["airing_today", "Airing today", "A morning alert when an episode from My Shows airs today."],
       ["new_season", "New season announced", "When BURGRS discovers a new season for a show in My Shows."],
       ["season_premiere_date", "Season premiere date", "When a first-air date is added for an upcoming season."],
+      ["for_you_recommendations", "90%+ For You picks", "One daily alert when a new recommendation reaches 90% or higher."],
     ],
   },
 ];
@@ -64,7 +66,7 @@ export default function NotificationPreferences({ sectionStyle }) {
 
         const { data, error: loadError } = await supabase
           .from("notification_preferences")
-          .select("follow, review_reply, chat_reply, creator_post_comment, creator_list_comment, airing_today, new_season, season_premiere_date")
+          .select("follow, review_reply, chat_reply, creator_post_comment, creator_list_comment, airing_today, new_season, season_premiere_date, for_you_recommendations")
           .eq("user_id", user.id)
           .maybeSingle();
 
