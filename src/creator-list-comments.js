@@ -336,8 +336,10 @@ function ensureActions(card, listKey) {
     });
   }
 
-  const share = card.querySelector(":scope > .burgrs-activity-share-btn");
-  if (share) actions.insertBefore(share, actions.firstChild);
+  const share = card.querySelector(".burgrs-activity-share-btn");
+  if (share && !actions.contains(share)) {
+    actions.insertBefore(share, actions.firstChild);
+  }
   actions.appendChild(comments);
 }
 
