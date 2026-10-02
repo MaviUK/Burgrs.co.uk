@@ -1243,3 +1243,36 @@
   opacity: 0.55;
   cursor: default;
 }
+
+
+.for-you-feedback-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.for-you-feedback {
+  min-height: 30px;
+  padding: 6px 5px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #cbd5e1;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.for-you-feedback:hover,
+.for-you-feedback:focus-visible {
+  border-color: rgba(196, 181, 253, 0.24);
+  background: rgba(124, 58, 237, 0.08);
+  color: #f8fafc;
+  outline: none;
+}
+
+.for-you-feedback:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
