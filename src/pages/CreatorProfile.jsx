@@ -204,45 +204,57 @@ function CreatorListCard({
         isExpanded ? "is-expanded" : ""
       } ${className}`.trim()}
     >
-      <button
-        type="button"
-        className="creator-list-cover-button"
-        onClick={() => onToggle(listId)}
-        aria-expanded={isExpanded}
-      >
-        <div className="creator-list-cover-art" aria-hidden="true">
-          {posterItems.length ? (
-            <div className="creator-list-poster-collage">
-              {posterItems.map((item, index) => (
-                <img
-                  key={`${listId}-poster-${item.show_id || item.id || index}`}
-                  src={item.poster_url}
-                  alt=""
-                  loading="lazy"
-                  className={`creator-list-collage-poster creator-list-collage-poster-${index + 1}`}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="creator-list-poster-collage creator-list-poster-collage-empty">
-              <span>TV</span>
-            </div>
-          )}
-          <div className="creator-list-cover-shade" />
-        </div>
-
-        <div className="creator-list-cover-content">
-          <div className="creator-list-cover-topline">
-            <span>{badge}</span>
-            <span>{isExpanded ? "Tap to close" : "Tap to expand"}</span>
+      <div className="creator-list-main">
+        <button
+          type="button"
+          className="creator-list-cover-button"
+          onClick={() => onToggle(listId)}
+          aria-expanded={isExpanded}
+        >
+          <div className="creator-list-cover-art" aria-hidden="true">
+            {posterItems.length ? (
+              <div className="creator-list-poster-collage">
+                {posterItems.map((item, index) => (
+                  <img
+                    key={`${listId}-poster-${item.show_id || item.id || index}`}
+                    src={item.poster_url}
+                    alt=""
+                    loading="lazy"
+                    className={`creator-list-collage-poster creator-list-collage-poster-${index + 1}`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="creator-list-poster-collage creator-list-poster-collage-empty">
+                <span>TV</span>
+              </div>
+            )}
+            <div className="creator-list-cover-shade" />
           </div>
 
-          <div>
-            <h3>{title}</h3>
-            <p>{subtitle}</p>
+          <div className="creator-list-cover-content">
+            <div className="creator-list-cover-topline">
+              <span>{badge}</span>
+              <span>{isExpanded ? "Tap to close" : "Tap to expand"}</span>
+            </div>
+
+            <div>
+              <h3>{title}</h3>
+              <p>{subtitle}</p>
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+
+        {canDelete ? (
+          <button
+            type="button"
+            className="creator-delete-post-btn"
+            onClick={() => onDelete(listId)}
+          >
+            Delete list
+          </button>
+        ) : null}
+      </div>
 
       {isExpanded ? (
         <div className="creator-list-expanded-body">
@@ -317,15 +329,6 @@ function CreatorListCard({
         </div>
       ) : null}
 
-      {canDelete ? (
-        <button
-          type="button"
-          className="creator-delete-post-btn"
-          onClick={() => onDelete(listId)}
-        >
-          Delete list
-        </button>
-      ) : null}
     </article>
   );
 }
