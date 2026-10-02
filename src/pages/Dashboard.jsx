@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { formatDate } from "../lib/date";
+import { addShowToUserList } from "../lib/userShows";
 import "./Dashboard.css";
 
 const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v19_EMPTY_STATES";
@@ -1014,7 +1015,7 @@ function NewsCard({ story, featured = false, compact = false }) {
   return <div className={className}>{card}</div>;
 }
 
-function ForYouCard({ show, onDismiss }) {
+function ForYouCard({ show, onDismiss, onAdd, isAdding }) {
   const href = show.tmdb_id
     ? `/show/tmdb/${show.tmdb_id}`
     : show.tvdb_id
@@ -1031,14 +1032,25 @@ function ForYouCard({ show, onDismiss }) {
         <strong>{show.name || "Unknown show"}</strong>
         <span className="for-you-reason">{show.reason || "Picked for your taste"}</span>
       </Link>
-      <button
-        type="button"
-        className="for-you-dismiss"
-        onClick={() => onDismiss?.(show)}
-        aria-label={`Don't recommend ${show.name || "this show"} again`}
-      >
-        Not for me
-      </button>
+      <div className="for-you-actions">
+        <button
+          type="button"
+          className="for-you-add"
+          onClick={() => onAdd?.(show)}
+          disabled={isAdding}
+        >
+          {isAdding ? "Adding..." : "Add to My Shows"}
+        </button>
+        <button
+          type="button"
+          className="for-you-dismiss"
+          onClick={() => onDismiss?.(show)}
+          disabled={isAdding}
+          aria-label={`Don't recommend ${show.name || "this show"} again`}
+        >
+          Not for me
+        </button>
+      </div>
     </div>
   );
 }
@@ -1080,6 +1092,66 @@ function StatCard({ label, value, to = null }) {
 export default function Dashboard() {
   const [dashboardView, setDashboardView] = useState(() => makeEmptyDashboardView());
   const [loading, setLoading] = useState(true);
+  const [addingForYouId, setAddingForYouId] = useState("");
+
+  async function addRecommendationToMyShows(show) {
+    const showId = String(show?.show_id || show?.id || "");
+    if (!showId || addingForYouId) return;
+
+    setAddingForYouId(showId);
+
+    try {
+      const savedShow = await addShowToUserList({
+        ...show,
+        id: show.show_id || show.id,
+        first_air_date: show.first_aired || show.first_air_date || null,
+      });
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      setDashboardView((current) => {
+        const next = {
+          ...current,
+          forYou: (current.forYou || []).filter(
+            (item) => String(item.show_id || item.id) !== showId
+          ),
+          savedShows: savedShow
+            ? [
+                ...(current.savedShows || []),
+                {
+                  id: savedShow.id,
+                  show_id: savedShow.id,
+                  show_name: savedShow.name || show.name,
+                  poster_url: savedShow.poster_url || show.poster_url,
+                  backdrop_url: savedShow.backdrop_url || show.backdrop_url,
+                  first_aired: savedShow.first_aired || show.first_aired,
+                  status: savedShow.status || show.status,
+                  tvdb_id: savedShow.tvdb_id || show.tvdb_id,
+                  tmdb_id: savedShow.tmdb_id || show.tmdb_id,
+                  watch_status: "watchlist",
+                },
+              ]
+            : current.savedShows,
+          stats: {
+            ...current.stats,
+            totalShows: Number(current.stats?.totalShows || 0) + 1,
+          },
+        };
+
+        if (user?.id) {
+          writeDashboardCache(user.id, next);
+        }
+
+        return next;
+      });
+    } catch (error) {
+      console.warn("Failed adding For You recommendation:", error);
+    } finally {
+      setAddingForYouId("");
+    }
+  }
 
   async function dismissRecommendation(show) {
     const showId = show?.show_id || show?.id;
@@ -1410,6 +1482,8 @@ export default function Dashboard() {
                 key={`for-you-${show.show_id}`}
                 show={show}
                 onDismiss={dismissRecommendation}
+                onAdd={addRecommendationToMyShows}
+                isAdding={addingForYouId === String(show.show_id || show.id || "")}
               />
             ))}
           </div>
