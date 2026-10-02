@@ -612,12 +612,21 @@ export default function FollowingFeed() {
         return;
       }
 
-      const response = await fetch("/.netlify/functions/taste-match-users", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+      let response;
+      try {
+        response = await fetch("/.netlify/functions/taste-match-users?limit=6", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -891,7 +900,7 @@ export default function FollowingFeed() {
             })}
           </div>
         ) : (
-          <p className="following-muted">
+          <p className="following-taste-empty">
             Add and rate more shows to start finding people with similar TV taste.
           </p>
         )}
