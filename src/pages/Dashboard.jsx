@@ -52,6 +52,7 @@ function makeEmptyDashboardView() {
     newsStories: [],
     friendPicks: [],
     forYou: [],
+    hiddenGems: [],
     stats: {
       totalShows: 0,
       inProgressCount: 0,
@@ -454,6 +455,35 @@ async function fetchForYouRecommendations() {
       : [];
   } catch (error) {
     console.warn("Dashboard For You fetch failed:", error);
+    return [];
+  }
+}
+
+async function fetchHiddenGems() {
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) return [];
+
+    const response = await fetch("/.netlify/functions/hidden-gems", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Could not load Hidden Gems.");
+    }
+
+    return Array.isArray(payload?.recommendations)
+      ? payload.recommendations
+      : [];
+  } catch (error) {
+    console.warn("Dashboard Hidden Gems fetch failed:", error);
     return [];
   }
 }
@@ -1349,7 +1379,7 @@ export default function Dashboard() {
           .map((show) => show.show_id)
           .filter(Boolean);
 
-        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks, forYou] = await Promise.all([
+        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks, forYou, hiddenGems] = await Promise.all([
           showIds.length
             ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
             : Promise.resolve([]),
@@ -1359,6 +1389,7 @@ export default function Dashboard() {
           fetchLatestNews(),
           fetchFriendPicks(user.id),
           fetchForYouRecommendations(),
+          fetchHiddenGems(),
         ]);
 
         const databaseShows = await fetchDatabaseShowMatches([
@@ -1382,6 +1413,7 @@ export default function Dashboard() {
           premieringSoonShows: premieringSoon,
           newsStories,
           forYou,
+          hiddenGems,
           friendPicks: friendPicks.filter(
             (pick) => !showIds.some((showId) => String(showId) === String(pick.id))
           ),
@@ -1411,6 +1443,7 @@ export default function Dashboard() {
   const newsStories = dashboardView.newsStories || [];
   const friendPicks = dashboardView.friendPicks || [];
   const forYou = dashboardView.forYou || [];
+  const hiddenGems = dashboardView.hiddenGems || [];
   const data = dashboardView.stats || makeEmptyDashboardView().stats;
   const upNext = data.upNext || data.continueWatching?.[0] || null;
   const continueWatching = data.upNext
@@ -1529,6 +1562,27 @@ export default function Dashboard() {
             {forYou.map((show) => (
               <ForYouCard
                 key={`for-you-${show.show_id}`}
+                show={show}
+                onFeedback={saveRecommendationFeedback}
+                onAdd={addRecommendationToMyShows}
+                isAdding={addingForYouId === String(show.show_id || show.id || "")}
+                savingFeedback={savingFeedbackId === String(show.show_id || show.id || "")}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {dashboardView.isSignedIn && hiddenGems.length > 0 ? (
+        <section className="dashboard-personal-section dashboard-hidden-gems-section">
+          <SectionHeader title="Hidden Gems" />
+          <p className="dashboard-for-you-subtitle">
+            Highly rated, less obvious picks tuned to your taste.
+          </p>
+          <div className="for-you-row">
+            {hiddenGems.map((show) => (
+              <ForYouCard
+                key={`hidden-gem-${show.show_id}`}
                 show={show}
                 onFeedback={saveRecommendationFeedback}
                 onAdd={addRecommendationToMyShows}
