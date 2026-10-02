@@ -743,3 +743,35 @@
     grid-auto-columns: minmax(176px, 72vw);
   }
 }
+
+
+/* Taste Match stays visually part of the feed rather than a card-within-a-card. */
+.following-page .following-taste-matches {
+  margin: 0 0 14px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.following-page .following-taste-head {
+  margin: 0 0 9px !important;
+  padding: 0 !important;
+}
+
+.following-page .following-taste-card {
+  padding: 2px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.following-page .following-taste-card:hover,
+.following-page .following-taste-card:focus-visible,
+.following-page .following-taste-card:active {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
