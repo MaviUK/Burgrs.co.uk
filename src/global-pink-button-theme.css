@@ -42,7 +42,7 @@
 .button,
 a.btn,
 a.button,
-button[class*="creator-"][class*="button"],
+button[class*="creator-"][class*="button"]:not(.creator-taste-strip-button),
 a[class*="creator-"][class*="button"],
 button[class*="profile-"][class*="button"],
 a[class*="profile-"][class*="button"] {
