@@ -1207,3 +1207,39 @@
   color: #f9a8d4;
   outline: none;
 }
+
+
+.for-you-actions {
+  display: grid;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.for-you-add,
+.for-you-dismiss {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 7px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.for-you-add {
+  border: 1px solid rgba(249, 168, 212, 0.26);
+  background: rgba(151, 7, 71, 0.18);
+  color: #f8fafc;
+}
+
+.for-you-add:hover,
+.for-you-add:focus-visible {
+  background: rgba(151, 7, 71, 0.28);
+  outline: none;
+}
+
+.for-you-add:disabled,
+.for-you-dismiss:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
