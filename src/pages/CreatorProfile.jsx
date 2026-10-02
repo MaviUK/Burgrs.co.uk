@@ -366,6 +366,7 @@ export default function CreatorProfile() {
   const [tasteMatchLoading, setTasteMatchLoading] = useState(false);
   const [tasteSummary, setTasteSummary] = useState(null);
   const [tasteSummaryLoading, setTasteSummaryLoading] = useState(false);
+  const [tasteDetailsOpen, setTasteDetailsOpen] = useState(false);
   const [tasteBrowseCategory, setTasteBrowseCategory] = useState("");
   const [tasteBrowseItems, setTasteBrowseItems] = useState([]);
   const [tasteBrowseLoading, setTasteBrowseLoading] = useState(false);
@@ -473,6 +474,7 @@ export default function CreatorProfile() {
     setTasteMatchLoading(false);
     setTasteSummary(null);
     setTasteSummaryLoading(false);
+    setTasteDetailsOpen(false);
     setTasteBrowseCategory("");
     setTasteBrowseItems([]);
     setTasteBrowseLoading(false);
@@ -726,6 +728,7 @@ export default function CreatorProfile() {
     }
 
     const nextPage = append ? tasteBrowsePage + 1 : 1;
+    setTasteDetailsOpen(false);
     setTasteBrowseCategory(category);
     setTasteBrowseLoading(true);
     setTasteBrowseError("");
@@ -830,50 +833,78 @@ export default function CreatorProfile() {
     setTasteMatchLoading(true);
 
     try {
+      async function fetchPaged(makeQuery) {
+        const rows = [];
+        const pageSize = 1000;
+        let from = 0;
+
+        while (true) {
+          const { data, error } = await makeQuery(from, from + pageSize - 1);
+          if (error) throw error;
+
+          const page = data || [];
+          rows.push(...page);
+          if (page.length < pageSize) break;
+          from += pageSize;
+        }
+
+        return rows;
+      }
+
       const [
-        myRatingsResult,
-        theirRatingsResult,
-        myRankingsResult,
-        theirRankingsResult,
+        myRatingRows,
+        theirRatingRows,
+        myRankingRows,
+        theirRankingRows,
       ] = await Promise.all([
-        supabase
-          .from("burgr_ratings")
-          .select("show_id, rating")
-          .eq("user_id", user.id),
-        supabase
-          .from("burgr_ratings")
-          .select("show_id, rating")
-          .eq("user_id", profileRow.id),
-        supabase
-          .from("user_show_rankings")
-          .select("show_id, ladder_position")
-          .eq("user_id", user.id)
-          .not("ladder_position", "is", null)
-          .order("ladder_position", { ascending: true }),
-        supabase
-          .from("user_show_rankings")
-          .select("show_id, ladder_position")
-          .eq("user_id", profileRow.id)
-          .not("ladder_position", "is", null)
-          .order("ladder_position", { ascending: true }),
+        fetchPaged((from, to) =>
+          supabase
+            .from("burgr_ratings")
+            .select("show_id, rating")
+            .eq("user_id", user.id)
+            .order("show_id", { ascending: true })
+            .range(from, to)
+        ),
+        fetchPaged((from, to) =>
+          supabase
+            .from("burgr_ratings")
+            .select("show_id, rating")
+            .eq("user_id", profileRow.id)
+            .order("show_id", { ascending: true })
+            .range(from, to)
+        ),
+        fetchPaged((from, to) =>
+          supabase
+            .from("user_show_rankings")
+            .select("show_id, ladder_position")
+            .eq("user_id", user.id)
+            .not("ladder_position", "is", null)
+            .order("ladder_position", { ascending: true })
+            .range(from, to)
+        ),
+        fetchPaged((from, to) =>
+          supabase
+            .from("user_show_rankings")
+            .select("show_id, ladder_position")
+            .eq("user_id", profileRow.id)
+            .not("ladder_position", "is", null)
+            .order("ladder_position", { ascending: true })
+            .range(from, to)
+        ),
       ]);
 
-      if (myRatingsResult.error) throw myRatingsResult.error;
-      if (theirRatingsResult.error) throw theirRatingsResult.error;
-      if (myRankingsResult.error) throw myRankingsResult.error;
-      if (theirRankingsResult.error) throw theirRankingsResult.error;
-
       const myRatings = new Map(
-        (myRatingsResult.data || []).map((row) => [String(row.show_id), Number(row.rating)])
+        myRatingRows.map((row) => [String(row.show_id), Number(row.rating)])
       );
       const theirRatings = new Map(
-        (theirRatingsResult.data || []).map((row) => [String(row.show_id), Number(row.rating)])
+        theirRatingRows.map((row) => [String(row.show_id), Number(row.rating)])
       );
 
       const sharedRatings = [];
       myRatings.forEach((myRating, showId) => {
         const theirRating = theirRatings.get(showId);
         if (!Number.isFinite(myRating) || !Number.isFinite(theirRating)) return;
+
         sharedRatings.push({
           show_id: showId,
           my_rating: myRating,
@@ -890,8 +921,9 @@ export default function CreatorProfile() {
           ) / sharedRatings.length
         : null;
 
-      const myRankings = myRankingsResult.data || [];
-      const theirRankings = theirRankingsResult.data || [];
+      const myRankings = myRankingRows;
+      const theirRankings = theirRankingRows;
+
       const myRankMap = new Map(
         myRankings.map((row, index) => [
           String(row.show_id),
@@ -904,6 +936,7 @@ export default function CreatorProfile() {
           },
         ])
       );
+
       const theirRankMap = new Map(
         theirRankings.map((row, index) => [
           String(row.show_id),
@@ -921,8 +954,11 @@ export default function CreatorProfile() {
       myRankMap.forEach((myRank, showId) => {
         const theirRank = theirRankMap.get(showId);
         if (!theirRank) return;
+
         sharedRanked.push({
           show_id: showId,
+          my_position: myRank.position,
+          their_position: theirRank.position,
           similarity: Math.max(
             0,
             100 - Math.abs(myRank.percentile - theirRank.percentile) * 100
@@ -941,14 +977,17 @@ export default function CreatorProfile() {
           .filter(([, rating]) => rating >= 80)
           .map(([showId]) => showId)
       );
+
       const theirFavourites = new Set(
         [...theirRatings.entries()]
           .filter(([, rating]) => rating >= 80)
           .map(([showId]) => showId)
       );
+
       const sharedFavouriteIds = [...myFavourites].filter((showId) =>
         theirFavourites.has(showId)
       );
+
       const favouriteBase = Math.min(myFavourites.size, theirFavourites.size);
       const favouriteSimilarity = favouriteBase
         ? (sharedFavouriteIds.length / favouriteBase) * 100
@@ -966,9 +1005,10 @@ export default function CreatorProfile() {
           components.reduce((sum, item) => sum + item.weight, 0)
         : null;
 
-      const score = sharedRatings.length >= 3 && weightedScore != null
-        ? Math.round(weightedScore)
-        : null;
+      const score =
+        sharedRatings.length >= 3 && weightedScore != null
+          ? Math.round(weightedScore)
+          : null;
 
       const confidence =
         sharedRatings.length >= 20
@@ -981,45 +1021,117 @@ export default function CreatorProfile() {
           ? "Early match"
           : "Not enough shared ratings";
 
-      const closestAgreement = sharedRatings.length
-        ? [...sharedRatings].sort(
-            (a, b) => a.difference - b.difference || b.average - a.average
-          )[0]
-        : null;
-      const biggestDisagreement = sharedRatings.length
-        ? [...sharedRatings].sort(
-            (a, b) => b.difference - a.difference || b.average - a.average
-          )[0]
-        : null;
+      const closestMatches = [...sharedRatings]
+        .sort((a, b) => a.difference - b.difference || b.average - a.average)
+        .slice(0, 3);
 
-      const recommendationCandidates = [...theirRatings.entries()]
+      const biggestDisagreements = [...sharedRatings]
+        .sort((a, b) => b.difference - a.difference || b.average - a.average)
+        .slice(0, 3);
+
+      const sharedFavouriteItems = sharedRatings
+        .filter((item) => item.my_rating >= 80 && item.their_rating >= 80)
+        .sort((a, b) => b.average - a.average)
+        .slice(0, 6);
+
+      const recommendationsForMe = [...theirRatings.entries()]
         .filter(([showId, rating]) => rating >= 80 && !myRatings.has(showId))
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([showId, rating]) => ({ show_id: showId, their_rating: rating }));
+        .slice(0, 6)
+        .map(([showId, rating]) => ({
+          show_id: showId,
+          their_rating: rating,
+        }));
+
+      const recommendationsForThem = [...myRatings.entries()]
+        .filter(([showId, rating]) => rating >= 80 && !theirRatings.has(showId))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([showId, rating]) => ({
+          show_id: showId,
+          my_rating: rating,
+        }));
+
+      const myTop10 = new Set(
+        myRankings.slice(0, 10).map((row) => String(row.show_id))
+      );
+      const theirTop10 = new Set(
+        theirRankings.slice(0, 10).map((row) => String(row.show_id))
+      );
+      const myTop25 = new Set(
+        myRankings.slice(0, 25).map((row) => String(row.show_id))
+      );
+      const theirTop25 = new Set(
+        theirRankings.slice(0, 25).map((row) => String(row.show_id))
+      );
+
+      const sharedTop10 = [...myTop10].filter((showId) => theirTop10.has(showId)).length;
+      const sharedTop25 = [...myTop25].filter((showId) => theirTop25.has(showId)).length;
 
       const detailIds = Array.from(
         new Set(
           [
-            closestAgreement?.show_id,
-            biggestDisagreement?.show_id,
-            ...recommendationCandidates.map((item) => item.show_id),
+            ...sharedRatings.map((item) => item.show_id),
+            ...recommendationsForMe.map((item) => item.show_id),
+            ...recommendationsForThem.map((item) => item.show_id),
           ].filter(Boolean)
         )
       );
 
-      let showMap = new Map();
-      if (detailIds.length) {
+      const showMap = new Map();
+
+      for (let index = 0; index < detailIds.length; index += 100) {
+        const batch = detailIds.slice(index, index + 100);
         const { data: showRows, error: showError } = await supabase
           .from("shows")
-          .select("id, name, first_aired, poster_url, tmdb_id")
-          .in("id", detailIds);
+          .select("id, name, first_aired, poster_url, tmdb_id, genres")
+          .in("id", batch);
 
         if (showError) throw showError;
-        showMap = new Map((showRows || []).map((show) => [String(show.id), show]));
+        (showRows || []).forEach((show) => showMap.set(String(show.id), show));
       }
 
-      const addShow = (item) => {
+      const genreStats = new Map();
+
+      sharedRatings.forEach((item) => {
+        const show = showMap.get(String(item.show_id));
+        const genres = Array.isArray(show?.genres) ? show.genres : [];
+
+        genres.forEach((genreValue) => {
+          const genre = String(genreValue || "").trim();
+          if (!genre) return;
+
+          const current = genreStats.get(genre) || {
+            genre,
+            count: 0,
+            myTotal: 0,
+            theirTotal: 0,
+          };
+
+          current.count += 1;
+          current.myTotal += item.my_rating;
+          current.theirTotal += item.their_rating;
+          genreStats.set(genre, current);
+        });
+      });
+
+      const genreMatches = [...genreStats.values()]
+        .filter((item) => item.count >= 2)
+        .map((item) => {
+          const myAverage = item.myTotal / item.count;
+          const theirAverage = item.theirTotal / item.count;
+          return {
+            genre: item.genre,
+            count: item.count,
+            myAverage: Math.round(myAverage),
+            theirAverage: Math.round(theirAverage),
+            match: Math.round(Math.max(0, 100 - Math.abs(myAverage - theirAverage))),
+          };
+        })
+        .sort((a, b) => b.count - a.count || b.match - a.match)
+        .slice(0, 6);
+
+      const attachShow = (item) => {
         if (!item) return null;
         return {
           ...item,
@@ -1035,10 +1147,18 @@ export default function CreatorProfile() {
         sharedFavourites: sharedFavouriteIds.length,
         ratingSimilarity:
           ratingSimilarity == null ? null : Math.round(ratingSimilarity),
-        rankSimilarity: rankSimilarity == null ? null : Math.round(rankSimilarity),
-        closestAgreement: addShow(closestAgreement),
-        biggestDisagreement: addShow(biggestDisagreement),
-        recommendations: recommendationCandidates.map(addShow),
+        rankSimilarity:
+          rankSimilarity == null ? null : Math.round(rankSimilarity),
+        favouriteSimilarity:
+          favouriteSimilarity == null ? null : Math.round(favouriteSimilarity),
+        sharedTop10,
+        sharedTop25,
+        genreMatches,
+        closestMatches: closestMatches.map(attachShow),
+        biggestDisagreements: biggestDisagreements.map(attachShow),
+        sharedFavouriteItems: sharedFavouriteItems.map(attachShow),
+        recommendationsForMe: recommendationsForMe.map(attachShow),
+        recommendationsForThem: recommendationsForThem.map(attachShow),
       });
     } catch (err) {
       console.warn("Failed loading Taste Match:", err);
@@ -1047,7 +1167,6 @@ export default function CreatorProfile() {
       setTasteMatchLoading(false);
     }
   }
-
   async function loadCreatorProfile() {
     setLoading(true);
     setError("");
@@ -1258,6 +1377,7 @@ export default function CreatorProfile() {
     setTasteBrowsePage(0);
     setTasteBrowseHasMore(false);
     setTasteBrowseTotal(0);
+    setTasteDetailsOpen(false);
     loadCreatorProfile();
   }, [username]);
 
@@ -1591,7 +1711,23 @@ export default function CreatorProfile() {
             </button>
           ))}
 
-          <div className="creator-taste-strip-item creator-taste-strip-overall">
+          <button
+            type="button"
+            className={`creator-taste-strip-item creator-taste-strip-overall creator-taste-overall${tasteDetailsOpen ? " is-active" : ""}`}
+            onClick={() => {
+              const next = !tasteDetailsOpen;
+              setTasteDetailsOpen(next);
+              if (next) {
+                setTasteBrowseCategory("");
+                setTasteBrowseItems([]);
+                setTasteBrowseError("");
+                setTasteBrowsePage(0);
+                setTasteBrowseHasMore(false);
+                setTasteBrowseTotal(0);
+              }
+            }}
+            aria-pressed={tasteDetailsOpen}
+          >
             <strong>
               {tasteMatchLoading
                 ? "…"
@@ -1607,7 +1743,227 @@ export default function CreatorProfile() {
                 ? "Rate more shows"
                 : tasteMatch.confidence}
             </small>
+          </button>
+        </section>
+      ) : null}
+
+      {tasteDetailsOpen ? (
+        <section className="creator-card creator-taste-match creator-taste-details">
+          <div className="creator-taste-match-head">
+            <div>
+              <span className="creator-taste-eyebrow">Taste Match</span>
+              <h2>You + {displayName}</h2>
+              <p className="creator-taste-detail-intro">
+                Ratings drive the score, with Rank'd order and shared favourites refining the match.
+              </p>
+            </div>
+            <div className={`creator-taste-score${tasteMatch?.score == null ? " is-empty" : ""}`}>
+              <strong>{tasteMatch?.score == null ? "--" : `${tasteMatch.score}%`}</strong>
+              <span>{tasteMatch?.confidence || "Building your match"}</span>
+            </div>
           </div>
+
+          {tasteMatchLoading ? (
+            <p className="creator-muted">Comparing your TV taste...</p>
+          ) : tasteMatch ? (
+            <>
+              <div className="creator-taste-metrics">
+                <div>
+                  <strong>{tasteMatch.sharedRatings}</strong>
+                  <span>Shared ratings</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.ratingSimilarity == null ? "--" : `${tasteMatch.ratingSimilarity}%`}</strong>
+                  <span>Rating similarity</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.rankSimilarity == null ? "--" : `${tasteMatch.rankSimilarity}%`}</strong>
+                  <span>Rank'd similarity</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.sharedFavourites}</strong>
+                  <span>Shared favourites</span>
+                </div>
+              </div>
+
+              <div className="creator-taste-rank-summary">
+                <div>
+                  <strong>{tasteMatch.sharedTop10}</strong>
+                  <span>Shared Top 10</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.sharedTop25}</strong>
+                  <span>Shared Top 25</span>
+                </div>
+                <div>
+                  <strong>{tasteMatch.sharedRanked}</strong>
+                  <span>Shared Rank'd shows</span>
+                </div>
+              </div>
+
+              {tasteMatch.genreMatches?.length ? (
+                <div className="creator-taste-detail-section">
+                  <div className="creator-section-head">
+                    <h3>Genre match</h3>
+                    <span>Based on genres you have both rated</span>
+                  </div>
+                  <div className="creator-taste-genre-grid">
+                    {tasteMatch.genreMatches.map((genre) => (
+                      <div key={genre.genre} className="creator-taste-genre">
+                        <strong>{genre.match}%</strong>
+                        <span>{genre.genre}</span>
+                        <small>
+                          You {genre.myAverage}% • {displayName} {genre.theirAverage}%
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.closestMatches?.length ? (
+                <div className="creator-taste-detail-section">
+                  <div className="creator-section-head">
+                    <h3>Closest matches</h3>
+                    <span>Shows you rated almost the same</span>
+                  </div>
+                  <div className="creator-taste-comparisons creator-taste-comparisons-three">
+                    {tasteMatch.closestMatches.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-comparison"
+                      >
+                        <span>{item.difference === 0 ? "Exact match" : `${Math.round(item.difference)} points apart`}</span>
+                        <strong>{item.show?.name || "Shared show"}</strong>
+                        <small>
+                          You {Math.round(item.my_rating)}% • {displayName} {Math.round(item.their_rating)}%
+                        </small>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.biggestDisagreements?.length ? (
+                <div className="creator-taste-detail-section">
+                  <div className="creator-section-head">
+                    <h3>Biggest disagreements</h3>
+                    <span>Where your scores differ most</span>
+                  </div>
+                  <div className="creator-taste-comparisons creator-taste-comparisons-three">
+                    {tasteMatch.biggestDisagreements.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-comparison"
+                      >
+                        <span>{Math.round(item.difference)} points apart</span>
+                        <strong>{item.show?.name || "Shared show"}</strong>
+                        <small>
+                          You {Math.round(item.my_rating)}% • {displayName} {Math.round(item.their_rating)}%
+                        </small>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.sharedFavouriteItems?.length ? (
+                <div className="creator-taste-detail-section creator-taste-recommendations">
+                  <div className="creator-section-head">
+                    <h3>Shared favourites</h3>
+                    <span>Shows you both rated 80%+</span>
+                  </div>
+                  <div className="creator-taste-recommendation-grid">
+                    {tasteMatch.sharedFavouriteItems.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-recommendation"
+                      >
+                        {item.show?.poster_url ? (
+                          <img src={item.show.poster_url} alt="" loading="lazy" />
+                        ) : (
+                          <span className="creator-taste-poster-fallback">?</span>
+                        )}
+                        <div>
+                          <strong>{item.show?.name || "Show"}</strong>
+                          <span>
+                            You {Math.round(item.my_rating)}% • {displayName} {Math.round(item.their_rating)}%
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.recommendationsForMe?.length ? (
+                <div className="creator-taste-detail-section creator-taste-recommendations">
+                  <div className="creator-section-head">
+                    <h3>You should try</h3>
+                    <span>{displayName} rated these highly and you haven't rated them</span>
+                  </div>
+                  <div className="creator-taste-recommendation-grid">
+                    {tasteMatch.recommendationsForMe.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-recommendation"
+                      >
+                        {item.show?.poster_url ? (
+                          <img src={item.show.poster_url} alt="" loading="lazy" />
+                        ) : (
+                          <span className="creator-taste-poster-fallback">?</span>
+                        )}
+                        <div>
+                          <strong>{item.show?.name || "Show"}</strong>
+                          <span>{displayName} rated it {Math.round(item.their_rating)}%</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.recommendationsForThem?.length ? (
+                <div className="creator-taste-detail-section creator-taste-recommendations">
+                  <div className="creator-section-head">
+                    <h3>{displayName} should try</h3>
+                    <span>You rated these highly and they haven't rated them</span>
+                  </div>
+                  <div className="creator-taste-recommendation-grid">
+                    {tasteMatch.recommendationsForThem.map((item) => (
+                      <Link
+                        key={item.show_id}
+                        to={showHref(item.show || { id: item.show_id })}
+                        className="creator-taste-recommendation"
+                      >
+                        {item.show?.poster_url ? (
+                          <img src={item.show.poster_url} alt="" loading="lazy" />
+                        ) : (
+                          <span className="creator-taste-poster-fallback">?</span>
+                        )}
+                        <div>
+                          <strong>{item.show?.name || "Show"}</strong>
+                          <span>You rated it {Math.round(item.my_rating)}%</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {tasteMatch.score == null ? (
+                <p className="creator-taste-note">
+                  Rate at least 3 of the same shows to unlock the overall Taste Match percentage.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="creator-muted">Taste Match is unavailable for this profile right now.</p>
+          )}
         </section>
       ) : null}
 
