@@ -1014,7 +1014,7 @@ function NewsCard({ story, featured = false, compact = false }) {
   return <div className={className}>{card}</div>;
 }
 
-function ForYouCard({ show }) {
+function ForYouCard({ show, onDismiss }) {
   const href = show.tmdb_id
     ? `/show/tmdb/${show.tmdb_id}`
     : show.tvdb_id
@@ -1022,14 +1022,24 @@ function ForYouCard({ show }) {
       : `/show/${show.show_id || show.id}`;
 
   return (
-    <Link to={href} className="for-you-card">
-      <div className="for-you-poster-wrap">
-        <Poster src={show.poster_url} alt={show.name} className="for-you-poster" />
-        <span className="for-you-score">{show.recommendation_score}%</span>
-      </div>
-      <strong>{show.name || "Unknown show"}</strong>
-      <span className="for-you-reason">{show.reason || "Picked for your taste"}</span>
-    </Link>
+    <div className="for-you-card">
+      <Link to={href} className="for-you-card-link">
+        <div className="for-you-poster-wrap">
+          <Poster src={show.poster_url} alt={show.name} className="for-you-poster" />
+          <span className="for-you-score">{show.recommendation_score}%</span>
+        </div>
+        <strong>{show.name || "Unknown show"}</strong>
+        <span className="for-you-reason">{show.reason || "Picked for your taste"}</span>
+      </Link>
+      <button
+        type="button"
+        className="for-you-dismiss"
+        onClick={() => onDismiss?.(show)}
+        aria-label={`Don't recommend ${show.name || "this show"} again`}
+      >
+        Not for me
+      </button>
+    </div>
   );
 }
 
@@ -1070,6 +1080,58 @@ function StatCard({ label, value, to = null }) {
 export default function Dashboard() {
   const [dashboardView, setDashboardView] = useState(() => makeEmptyDashboardView());
   const [loading, setLoading] = useState(true);
+
+  async function dismissRecommendation(show) {
+    const showId = show?.show_id || show?.id;
+    if (!showId) return;
+
+    const previousForYou = dashboardView.forYou || [];
+
+    setDashboardView((current) => ({
+      ...current,
+      forYou: (current.forYou || []).filter(
+        (item) => String(item.show_id || item.id) !== String(showId)
+      ),
+    }));
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user?.id) throw new Error("You must be logged in.");
+
+      const { error } = await supabase
+        .from("recommendation_feedback")
+        .upsert(
+          {
+            user_id: user.id,
+            show_id: showId,
+            feedback_type: "not_interested",
+          },
+          { onConflict: "user_id,show_id" }
+        );
+
+      if (error) throw error;
+
+      const nextView = {
+        ...dashboardView,
+        forYou: previousForYou.filter(
+          (item) => String(item.show_id || item.id) !== String(showId)
+        ),
+      };
+
+      writeDashboardCache(user.id, nextView);
+    } catch (error) {
+      console.warn("Failed saving recommendation feedback:", error);
+      setDashboardView((current) => ({
+        ...current,
+        forYou: previousForYou,
+      }));
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1344,7 +1406,11 @@ export default function Dashboard() {
           </p>
           <div className="for-you-row">
             {forYou.map((show) => (
-              <ForYouCard key={`for-you-${show.show_id}`} show={show} />
+              <ForYouCard
+                key={`for-you-${show.show_id}`}
+                show={show}
+                onDismiss={dismissRecommendation}
+              />
             ))}
           </div>
         </section>
