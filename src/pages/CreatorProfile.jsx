@@ -2175,7 +2175,9 @@ export default function CreatorProfile() {
         </section>
       ) : null}
 
-      <section className="creator-card creator-profile-panel">
+      <section
+        className={`creator-card creator-profile-panel${activeProfilePanel === "lists" ? " creator-profile-panel-lists" : ""}`}
+      >
         {activeProfilePanel === "followers" ? (
           <>
             <div className="creator-section-head">
