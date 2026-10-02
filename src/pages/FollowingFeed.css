@@ -775,3 +775,11 @@
   background: transparent !important;
   box-shadow: none !important;
 }
+
+
+.following-taste-empty {
+  margin: 6px 0 2px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.45;
+}
