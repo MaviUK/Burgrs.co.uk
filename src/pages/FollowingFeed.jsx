@@ -533,6 +533,8 @@ export default function FollowingFeed() {
   const [posts, setPosts] = useState([]);
   const [lists, setLists] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
+  const [tasteMatches, setTasteMatches] = useState([]);
+  const [tasteMatchesLoading, setTasteMatchesLoading] = useState(false);
   const [expandedListIds, setExpandedListIds] = useState(() => new Set());
   const [openCommentIds, setOpenCommentIds] = useState(() => new Set());
   const [error, setError] = useState("");
@@ -595,6 +597,40 @@ export default function FollowingFeed() {
         <em>{isOpen ? "⌃" : "⌄"}</em>
       </button>
     );
+  }
+
+  async function loadTasteMatches() {
+    setTasteMatchesLoading(true);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        setTasteMatches([]);
+        return;
+      }
+
+      const response = await fetch("/.netlify/functions/taste-match-users", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.error || "Could not load Taste Matches.");
+      }
+
+      setTasteMatches(result?.matches || []);
+    } catch (err) {
+      console.warn("Taste Match discovery failed:", err);
+      setTasteMatches([]);
+    } finally {
+      setTasteMatchesLoading(false);
+    }
   }
 
   async function loadFeed() {
@@ -799,12 +835,71 @@ export default function FollowingFeed() {
 
   useEffect(() => {
     loadFeed();
+    loadTasteMatches();
   }, []);
 
   const activeFilterLabel = FILTERS.find((filter) => filter.key === activeFilter)?.label || "items";
 
   return (
     <main className="following-page">
+      <section className="following-taste-matches" aria-label="Your closest Taste Matches">
+        <div className="following-taste-head">
+          <div>
+            <span>Taste Match</span>
+            <h2>Your closest matches</h2>
+          </div>
+          <small>Based on ratings, Rank'd and your show libraries</small>
+        </div>
+
+        {tasteMatchesLoading ? (
+          <p className="following-muted">Finding your closest Taste Matches...</p>
+        ) : tasteMatches.length ? (
+          <div className="following-taste-scroll">
+            {tasteMatches.map((match) => {
+              const matchProfile = match.profile || {};
+              const matchName = getProfileDisplayName(matchProfile, "BURGRS user");
+              const matchHref = getProfileHref(matchProfile, matchProfile.id);
+              const avatarUrl = matchProfile.avatar_url || "";
+              const initial = matchName.slice(0, 1).toUpperCase();
+
+              return (
+                <Link
+                  key={matchProfile.id}
+                  to={matchHref}
+                  className="following-taste-card"
+                >
+                  <div className="following-taste-avatar-wrap">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="" className="following-taste-avatar" />
+                    ) : (
+                      <span className="following-taste-avatar following-taste-avatar-fallback">
+                        {initial}
+                      </span>
+                    )}
+                    <strong>{Math.round(Number(match.score || 0))}%</strong>
+                  </div>
+                  <div className="following-taste-card-copy">
+                    <strong>{matchName}</strong>
+                    {matchProfile.username ? (
+                      <span>@{matchProfile.username}</span>
+                    ) : null}
+                    <small>
+                      {match.score_source === "ratings"
+                        ? `${match.shared_ratings} shared rating${match.shared_ratings === 1 ? "" : "s"}`
+                        : "Library-based match"}
+                    </small>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="following-muted">
+            Add and rate more shows to start finding people with similar TV taste.
+          </p>
+        )}
+      </section>
+
       <div className="following-filter-row" aria-label="Filter following feed">
         {FILTERS.map((filter) => (
           <button
