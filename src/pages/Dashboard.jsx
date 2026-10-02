@@ -50,6 +50,7 @@ function makeEmptyDashboardView() {
     premieringSoonShows: [],
     newsStories: [],
     friendPicks: [],
+    forYou: [],
     stats: {
       totalShows: 0,
       inProgressCount: 0,
@@ -423,6 +424,35 @@ async function fetchLatestNews() {
     return data || [];
   } catch (error) {
     console.warn("Dashboard news fetch failed:", error);
+    return [];
+  }
+}
+
+async function fetchForYouRecommendations() {
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) return [];
+
+    const response = await fetch("/.netlify/functions/for-you-recommendations", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Could not load recommendations.");
+    }
+
+    return Array.isArray(payload?.recommendations)
+      ? payload.recommendations
+      : [];
+  } catch (error) {
+    console.warn("Dashboard For You fetch failed:", error);
     return [];
   }
 }
@@ -984,6 +1014,25 @@ function NewsCard({ story, featured = false, compact = false }) {
   return <div className={className}>{card}</div>;
 }
 
+function ForYouCard({ show }) {
+  const href = show.tmdb_id
+    ? `/show/tmdb/${show.tmdb_id}`
+    : show.tvdb_id
+      ? `/show/${show.tvdb_id}`
+      : `/show/${show.show_id || show.id}`;
+
+  return (
+    <Link to={href} className="for-you-card">
+      <div className="for-you-poster-wrap">
+        <Poster src={show.poster_url} alt={show.name} className="for-you-poster" />
+        <span className="for-you-score">{show.recommendation_score}%</span>
+      </div>
+      <strong>{show.name || "Unknown show"}</strong>
+      <span className="for-you-reason">{show.reason || "Picked for your taste"}</span>
+    </Link>
+  );
+}
+
 function FriendPickCard({ show }) {
   const href = show.tmdb_id
     ? `/show/tmdb/${show.tmdb_id}`
@@ -1117,7 +1166,7 @@ export default function Dashboard() {
           .map((show) => show.show_id)
           .filter(Boolean);
 
-        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks] = await Promise.all([
+        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks, forYou] = await Promise.all([
           showIds.length
             ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
             : Promise.resolve([]),
@@ -1126,6 +1175,7 @@ export default function Dashboard() {
           fetchPremieringSoonShows().catch(() => []),
           fetchLatestNews(),
           fetchFriendPicks(user.id),
+          fetchForYouRecommendations(),
         ]);
 
         const databaseShows = await fetchDatabaseShowMatches([
@@ -1148,6 +1198,7 @@ export default function Dashboard() {
           trendingShows: trending,
           premieringSoonShows: premieringSoon,
           newsStories,
+          forYou,
           friendPicks: friendPicks.filter(
             (pick) => !showIds.some((showId) => String(showId) === String(pick.id))
           ),
@@ -1176,6 +1227,7 @@ export default function Dashboard() {
   const premieringSoonShows = dashboardView.premieringSoonShows || [];
   const newsStories = dashboardView.newsStories || [];
   const friendPicks = dashboardView.friendPicks || [];
+  const forYou = dashboardView.forYou || [];
   const data = dashboardView.stats || makeEmptyDashboardView().stats;
   const upNext = data.upNext || data.continueWatching?.[0] || null;
   const continueWatching = data.upNext
@@ -1280,6 +1332,20 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {dashboardView.isSignedIn && forYou.length > 0 ? (
+        <section className="dashboard-personal-section dashboard-for-you-section">
+          <SectionHeader title="For You" />
+          <p className="dashboard-for-you-subtitle">
+            Personalised from your ratings, Rank'd list and people with similar taste.
+          </p>
+          <div className="for-you-row">
+            {forYou.map((show) => (
+              <ForYouCard key={`for-you-${show.show_id}`} show={show} />
+            ))}
           </div>
         </section>
       ) : null}
