@@ -943,3 +943,52 @@
     font-size: 9px !important;
   }
 }
+
+
+/* Align creator-list bottom action labels on one clean baseline. */
+.creator-profile-panel-lists
+  .creator-list-main
+  .creator-list-actions-row {
+  align-items: center !important;
+}
+
+.creator-profile-panel-lists
+  .creator-list-main
+  .creator-list-actions-row
+  .burgrs-activity-share-btn,
+.creator-profile-panel-lists
+  .creator-list-main
+  .creator-list-comments-toggle,
+.creator-profile-panel-lists
+  .creator-list-main
+  > .creator-delete-post-btn {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+}
+
+.creator-profile-panel-lists
+  .creator-list-main
+  .creator-list-actions-row
+  .burgrs-activity-share-btn {
+  justify-self: start !important;
+}
+
+.creator-profile-panel-lists
+  .creator-list-main
+  .creator-list-comments-toggle {
+  justify-self: end !important;
+}
+
+.creator-profile-panel-lists
+  .creator-list-main
+  > .creator-delete-post-btn {
+  bottom: 13px !important;
+}
