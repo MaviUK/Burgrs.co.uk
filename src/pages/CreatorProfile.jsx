@@ -1252,6 +1252,12 @@ export default function CreatorProfile() {
   useEffect(() => {
     setExpandedListIds(new Set());
     setActiveProfilePanel("lists");
+    setTasteBrowseCategory("");
+    setTasteBrowseItems([]);
+    setTasteBrowseError("");
+    setTasteBrowsePage(0);
+    setTasteBrowseHasMore(false);
+    setTasteBrowseTotal(0);
     loadCreatorProfile();
   }, [username]);
 
