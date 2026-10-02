@@ -298,6 +298,15 @@ export async function handler(event) {
     }
 
     const viewer = await verifyUser({ supabaseUrl, anonKey, accessToken });
+    const mode = String(event.queryStringParameters?.mode || "closest").toLowerCase();
+    const minShared = Math.max(
+      0,
+      Math.min(100, Number(event.queryStringParameters?.minShared || 0))
+    );
+    const limit = Math.max(
+      1,
+      Math.min(50, Number(event.queryStringParameters?.limit || 30))
+    );
 
     const [
       profiles,
@@ -503,8 +512,22 @@ export async function handler(event) {
         };
       })
       .filter((item) => Number.isFinite(Number(item.score)))
-      .sort(
-        (a, b) =>
+      .filter((item) => Number(item.shared_ratings || 0) >= minShared)
+      .filter((item) => (mode === "new" ? !item.following : true))
+      .sort((a, b) => {
+        if (mode === "opposites") {
+          return (
+            Number(a.score) - Number(b.score) ||
+            Number(b.shared_ratings) - Number(a.shared_ratings)
+          );
+        }
+        if (mode === "favourites") {
+          return (
+            Number(b.shared_favourites || 0) - Number(a.shared_favourites || 0) ||
+            Number(b.score) - Number(a.score)
+          );
+        }
+        return (
           Number(b.score) - Number(a.score) ||
           Number(b.shared_ratings) - Number(a.shared_ratings) ||
           String(a.profile?.display_name || a.profile?.username || "").localeCompare(
@@ -512,8 +535,9 @@ export async function handler(event) {
             "en-GB",
             { sensitivity: "base" }
           )
-      )
-      .slice(0, 6);
+        );
+      })
+      .slice(0, limit);
 
     return jsonResponse(200, {
       ok: true,
