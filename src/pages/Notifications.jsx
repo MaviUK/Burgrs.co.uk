@@ -464,7 +464,18 @@ export default function Notifications() {
           {items.map((item) => {
             const actorName = getProfileName(item.actor_profile);
             const avatarUrl = item.actor_profile?.avatar_url || "";
-            const initial = actorName.slice(0, 1).toUpperCase();
+            const usesShowArtwork = [
+              "airing_today",
+              "new_season",
+              "season_premiere_date",
+            ].includes(item.type);
+            const thumbnailUrl = usesShowArtwork
+              ? item.show?.poster_url || ""
+              : avatarUrl;
+            const fallbackName = usesShowArtwork
+              ? item.show?.name || item.title || "Show"
+              : actorName;
+            const initial = fallbackName.slice(0, 1).toUpperCase();
             const isSelected = selectedIds.has(item.id);
 
             return (
@@ -502,12 +513,15 @@ export default function Notifications() {
                     </span>
                   ) : null}
 
-                  <span className="notification-icon" aria-hidden="true">
-                    {avatarUrl ? (
+                  <span
+                    className={`notification-icon${usesShowArtwork ? " is-show-artwork" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {thumbnailUrl ? (
                       <img
-                        src={avatarUrl}
+                        src={thumbnailUrl}
                         alt=""
-                        className="notification-avatar"
+                        className={usesShowArtwork ? "notification-show-poster" : "notification-avatar"}
                       />
                     ) : (
                       <span className="notification-avatar-fallback">
