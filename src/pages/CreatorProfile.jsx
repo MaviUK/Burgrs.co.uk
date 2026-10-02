@@ -1878,6 +1878,32 @@ export default function CreatorProfile() {
                 </div>
               </div>
 
+              <div className="creator-taste-detail-section creator-taste-library-compare">
+                <div className="creator-section-head">
+                  <h3>Library comparison</h3>
+                  <span>Tap a section to browse the shows</span>
+                </div>
+                <div className="creator-taste-library-grid">
+                  {[
+                    ["mutual", "Both have", "Mutual shows"],
+                    ["both_completed", "Both completed", "Finished by both"],
+                    ["both_watching", "Both watching", "Watching together"],
+                    ["only_them", `Only ${displayName}`, "Shows you haven't added"],
+                    ["only_me", "Only you", `${displayName} hasn't added`],
+                  ].map(([key, label, sub]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className="creator-taste-library-button"
+                      onClick={() => loadTasteBrowse(key)}
+                    >
+                      <strong>{label}</strong>
+                      <span>{sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {tasteMatch.genreMatches?.length ? (
                 <div className="creator-taste-detail-section">
                   <div className="creator-section-head">
@@ -2059,7 +2085,17 @@ export default function CreatorProfile() {
                   ? `${displayName}'s completed shows`
                   : tasteBrowseCategory === "watching"
                   ? `${displayName} is watching`
-                  : `${displayName}'s currently airing shows`}
+                  : tasteBrowseCategory === "airing"
+                  ? `${displayName}'s currently airing shows`
+                  : tasteBrowseCategory === "mutual"
+                  ? "Shows you both have"
+                  : tasteBrowseCategory === "both_completed"
+                  ? "Shows you both completed"
+                  : tasteBrowseCategory === "both_watching"
+                  ? "Shows you are both watching"
+                  : tasteBrowseCategory === "only_them"
+                  ? `Only ${displayName} has these`
+                  : "Only you have these"}
               </h2>
               <span>
                 {tasteBrowseLoading && !tasteBrowseItems.length
