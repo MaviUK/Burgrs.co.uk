@@ -468,6 +468,7 @@ export default function Notifications() {
               "airing_today",
               "new_season",
               "season_premiere_date",
+              "for_you_recommendation",
             ].includes(item.type);
             const thumbnailUrl = usesShowArtwork
               ? item.show?.poster_url || ""
