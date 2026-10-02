@@ -253,7 +253,9 @@ async function openPanel(card, actions, button, listKey, forceOpen = false) {
   const panel = document.createElement("div");
   panel.className = "creator-list-comments-panel";
   panel.textContent = "Loading comments...";
-  actions.insertAdjacentElement("afterend", panel);
+  const main = card.querySelector(":scope > .creator-list-main");
+  if (main) main.insertAdjacentElement("afterend", panel);
+  else actions.insertAdjacentElement("afterend", panel);
 
   try {
     const comments = await loadComments(listKey);
@@ -311,11 +313,12 @@ async function openPanel(card, actions, button, listKey, forceOpen = false) {
 function ensureActions(card, listKey) {
   card.dataset.creatorListKey = String(listKey);
 
-  let actions = card.querySelector(":scope > .creator-list-actions-row");
+  const main = card.querySelector(":scope > .creator-list-main") || card;
+  let actions = main.querySelector(":scope > .creator-list-actions-row");
   if (!actions) {
     actions = document.createElement("div");
     actions.className = "creator-list-actions-row";
-    card.querySelector(":scope > .creator-list-cover-button")?.insertAdjacentElement("afterend", actions);
+    main.appendChild(actions);
   }
 
   let comments = actions.querySelector(".creator-list-comments-toggle");
