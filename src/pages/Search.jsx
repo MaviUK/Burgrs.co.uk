@@ -30,6 +30,28 @@ const SORT_OPTIONS = [
   { id: "a-z", label: "A-Z" },
 ];
 
+const SEARCH_SESSION_KEY = "burgrs:search-session:v1";
+
+function readSearchSession() {
+  try {
+    const raw = window.sessionStorage.getItem(SEARCH_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    console.warn("Could not restore search session", error);
+    return null;
+  }
+}
+
+function writeSearchSession(value) {
+  try {
+    window.sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify(value));
+  } catch (error) {
+    console.warn("Could not save search session", error);
+  }
+}
+
 function hasActiveFilters(filters) {
   return Object.values(filters || {}).some((value) => String(value || "").trim());
 }
@@ -228,6 +250,7 @@ export default function Search() {
   const [appliedFilters, setAppliedFilters] = useState(() => ({ ...EMPTY_FILTERS }));
   const [sortOrder, setSortOrder] = useState("default");
   const loadMoreRef = useRef(null);
+  const restoringSearchRef = useRef(false);
 
   const titleQuery = searchParams.get("q") || "";
   const genreFilter = searchParams.get("genre") || "";
@@ -283,6 +306,87 @@ export default function Search() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const hasUrlDrivenSearch =
+      Boolean(titleQuery) ||
+      Boolean(genreFilter) ||
+      Boolean(networkFilter) ||
+      Boolean(relationshipTypeFilter) ||
+      Boolean(settingFilter);
+
+    if (hasUrlDrivenSearch) return;
+
+    const saved = readSearchSession();
+    if (!saved) return;
+
+    restoringSearchRef.current = true;
+
+    setSearchMode(saved.searchMode || "title");
+    setQuery(saved.query || "");
+    setShows(Array.isArray(saved.shows) ? saved.shows : []);
+    setMatchedLabel(saved.matchedLabel || "");
+    setAdvancedPage(Number(saved.advancedPage || 1));
+    setHasMore(Boolean(saved.hasMore));
+    setTotalResults(Number(saved.totalResults || 0));
+    setActiveFilters({ ...EMPTY_FILTERS, ...(saved.activeFilters || {}) });
+    setAppliedFilters({ ...EMPTY_FILTERS, ...(saved.appliedFilters || {}) });
+    setSortOrder(saved.sortOrder || "default");
+
+    const scrollY = Math.max(0, Number(saved.scrollY || 0));
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+        restoringSearchRef.current = false;
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (restoringSearchRef.current) return;
+
+    const previous = readSearchSession();
+    writeSearchSession({
+      searchMode,
+      query,
+      shows,
+      matchedLabel,
+      advancedPage,
+      hasMore,
+      totalResults,
+      activeFilters,
+      appliedFilters,
+      sortOrder,
+      scrollY: Number(previous?.scrollY || 0),
+    });
+  }, [
+    searchMode,
+    query,
+    shows,
+    matchedLabel,
+    advancedPage,
+    hasMore,
+    totalResults,
+    activeFilters,
+    appliedFilters,
+    sortOrder,
+  ]);
+
+  function rememberSearchPosition() {
+    writeSearchSession({
+      searchMode,
+      query,
+      shows,
+      matchedLabel,
+      advancedPage,
+      hasMore,
+      totalResults,
+      activeFilters,
+      appliedFilters,
+      sortOrder,
+      scrollY: window.scrollY || 0,
+    });
+  }
 
   useEffect(() => {
     if (titleQuery) {
@@ -878,7 +982,11 @@ export default function Search() {
                 }}
               >
                 <div className="search-result-banner-inner">
-                  <Link to={detailHref} className="search-result-poster-link">
+                  <Link
+                    to={detailHref}
+                    className="search-result-poster-link"
+                    onClick={rememberSearchPosition}
+                  >
                     {poster ? (
                       <img
                         src={poster}
@@ -903,7 +1011,11 @@ export default function Search() {
                   </Link>
 
                   <div className="search-result-content">
-                    <Link to={detailHref} className="search-result-title-link">
+                    <Link
+                      to={detailHref}
+                      className="search-result-title-link"
+                      onClick={rememberSearchPosition}
+                    >
                       <h3 className="search-result-title">
                         {show.name || show.show_name}
                       </h3>
