@@ -652,8 +652,8 @@ export default function ProfileEditMerged() {
             View creator page
           </Link>
           {currentUserId === BURGRS_TV_PROFILE_ID ? (
-            <Link to="/admin/health" style={secondaryButtonStyle}>
-              System health
+            <Link to="/admin" style={secondaryButtonStyle}>
+              Admin
             </Link>
           ) : null}
           <button type="button" onClick={handleLogout} style={secondaryButtonStyle}>
