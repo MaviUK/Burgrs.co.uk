@@ -91,6 +91,73 @@
   color: #ede9fe;
 }
 
+.search-refine-wrap {
+  margin: 0 0 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(151, 7, 71, 0.3);
+  border-radius: 14px;
+  background: rgba(151, 7, 71, 0.08);
+}
+
+.search-refine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  color: #f8fafc;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.search-clear-filters {
+  appearance: none;
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: #d9a5bc;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.search-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.search-filter-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid rgba(151, 7, 71, 0.38);
+  border-radius: 999px;
+  background: rgba(151, 7, 71, 0.16);
+  color: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.search-filter-chip-label {
+  color: #d9a5bc;
+  font-weight: 800;
+}
+
+.search-filter-chip-x {
+  margin-left: 2px;
+  color: #f8fafc;
+  font-size: 1rem;
+  line-height: 0.8;
+}
+
 .search-error-text {
   color: #fca5a5;
   margin-bottom: 16px;
