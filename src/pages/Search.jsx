@@ -21,6 +21,15 @@ const EMPTY_FILTERS = {
   studio: "",
 };
 
+const SORT_OPTIONS = [
+  { id: "default", label: "Default" },
+  { id: "highest-rated", label: "Highest rated" },
+  { id: "most-popular", label: "Most popular" },
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
+  { id: "a-z", label: "A-Z" },
+];
+
 function hasActiveFilters(filters) {
   return Object.values(filters || {}).some((value) => String(value || "").trim());
 }
@@ -101,6 +110,49 @@ function mergeUniqueShows(existing, incoming) {
   return Array.from(merged.values());
 }
 
+function sortLoadedShows(items, sort) {
+  const results = [...(items || [])];
+
+  if (sort === "highest-rated") {
+    return results.sort((a, b) => {
+      const ratingDiff =
+        Number(b?.rating_average || 0) - Number(a?.rating_average || 0);
+      if (ratingDiff) return ratingDiff;
+      return Number(b?.rating_count || 0) - Number(a?.rating_count || 0);
+    });
+  }
+
+  if (sort === "most-popular") {
+    return results.sort(
+      (a, b) => Number(b?.popularity || 0) - Number(a?.popularity || 0)
+    );
+  }
+
+  if (sort === "newest" || sort === "oldest") {
+    const direction = sort === "newest" ? -1 : 1;
+    return results.sort((a, b) => {
+      const aDate = String(getFirstAired(a) || "");
+      const bDate = String(getFirstAired(b) || "");
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return aDate.localeCompare(bDate) * direction;
+    });
+  }
+
+  if (sort === "a-z") {
+    return results.sort((a, b) =>
+      String(a?.name || a?.show_name || "").localeCompare(
+        String(b?.name || b?.show_name || ""),
+        "en",
+        { sensitivity: "base" }
+      )
+    );
+  }
+
+  return results;
+}
+
 function getDetailHref(show, savedByTvdb, savedByTmdb) {
   if (savedByTvdb && show?.tvdb_id) {
     return `/my-shows/${show.tvdb_id}`;
@@ -150,6 +202,7 @@ export default function Search() {
   const [totalResults, setTotalResults] = useState(0);
   const [activeFilters, setActiveFilters] = useState(() => ({ ...EMPTY_FILTERS }));
   const [appliedFilters, setAppliedFilters] = useState(() => ({ ...EMPTY_FILTERS }));
+  const [sortOrder, setSortOrder] = useState("default");
   const loadMoreRef = useRef(null);
 
   const titleQuery = searchParams.get("q") || "";
@@ -338,6 +391,7 @@ export default function Search() {
       const params = new URLSearchParams({
         region: "GB",
         page: String(page),
+        sort: sortOrder,
       });
 
       Object.entries(filters || {}).forEach(([key, value]) => {
@@ -352,7 +406,10 @@ export default function Search() {
       if (!res.ok) throw new Error(data?.message || "Refined search failed");
 
       const results = Array.isArray(data?.results) ? data.results : [];
-      const combined = append ? mergeUniqueShows(shows, results) : results;
+      const combined = sortLoadedShows(
+        append ? mergeUniqueShows(shows, results) : results,
+        sortOrder
+      );
       const returnedTotal = Number(data?.totalResults);
       const safeTotal =
         Number.isFinite(returnedTotal) && returnedTotal > 0
@@ -477,6 +534,61 @@ export default function Search() {
     advancedPage,
     activeFilters,
   ]);
+
+  async function handleSortChange(nextSort) {
+    setSortOrder(nextSort);
+
+    if (!hasActiveFilters(activeFilters) || loading || loadingMore) return;
+
+    const previousSort = sortOrder;
+    setSortOrder(nextSort);
+
+    try {
+      const activeUserId = await getCurrentUserId();
+      setCurrentUserId(activeUserId);
+      setLoading(true);
+      setError("");
+
+      const params = new URLSearchParams({
+        region: "GB",
+        page: "1",
+        sort: nextSort,
+      });
+
+      Object.entries(activeFilters).forEach(([key, value]) => {
+        const trimmed = String(value || "").trim();
+        if (trimmed) params.set(key, trimmed);
+      });
+
+      const res = await fetch(
+        `/.netlify/functions/advancedSearchShows?${params.toString()}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Could not sort results");
+
+      const results = sortLoadedShows(
+        Array.isArray(data?.results) ? data.results : [],
+        nextSort
+      );
+
+      setShows(results);
+      setAdvancedPage(Number(data?.page || 1));
+      setHasMore(Boolean(data?.hasMore));
+      const returnedTotal = Number(data?.totalResults);
+      setTotalResults(
+        Number.isFinite(returnedTotal) && returnedTotal > 0
+          ? Math.max(returnedTotal, results.length)
+          : results.length
+      );
+      await markAlreadySaved(results, activeUserId);
+    } catch (err) {
+      console.error("Sort search results failed:", err);
+      setError(err.message || "Could not sort results");
+      setSortOrder(previousSort);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function changeMode(nextMode) {
     if (nextMode === searchMode) return;
@@ -657,6 +769,25 @@ export default function Search() {
           </div>
         ) : null}
 
+        {shows.length > 0 ? (
+          <div className="search-sort-row">
+            <label htmlFor="search-sort-select">Sort by</label>
+            <select
+              id="search-sort-select"
+              className="search-sort-select"
+              value={sortOrder}
+              onChange={(event) => handleSortChange(event.target.value)}
+              disabled={loading || loadingMore}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div className="search-results-list">
           {shows.map((show) => {
             const resultKey = getResultKey(show);
@@ -754,6 +885,15 @@ export default function Search() {
                         <div className="search-result-meta-row">
                           <span className="search-result-meta-label">Genre</span>
                           <span className="search-result-meta-value">{genres}</span>
+                        </div>
+                      ) : null}
+
+                      {Number(show.rating_average) > 0 ? (
+                        <div className="search-result-meta-row">
+                          <span className="search-result-meta-label">Rating</span>
+                          <span className="search-result-meta-value">
+                            {Number(show.rating_average).toFixed(1)}/10
+                          </span>
                         </div>
                       ) : null}
 
