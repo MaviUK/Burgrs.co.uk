@@ -22,7 +22,6 @@ import './rankd-guest-share-vote.css'
 import './public-shared-content.css'
 import './show-data-refresh-button.css'
 import './remove-show-data-refresh-button.css'
-import './dashboard-premiering-soon.css'
 import './firefox-mobile-nav-fix.css'
 import './notification-alerts.css'
 import './public-show-watch-providers.css'
@@ -134,7 +133,6 @@ function loadDeferredEnhancements() {
     import('./rankd-shared-stats-fix.js'),
     import('./public-shared-content.js'),
     import('./show-data-refresh-button.js'),
-    import('./dashboard-premiering-soon.js'),
     import('./notification-nav-badge.js'),
     import('./notification-deep-links.js'),
     import('./notification-copy-cleanup.js'),
