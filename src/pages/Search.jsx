@@ -57,6 +57,19 @@ function hasActiveFilters(filters) {
   return Object.values(filters || {}).some((value) => String(value || "").trim());
 }
 
+function countryLabel(country) {
+  const code = String(country || "GB").trim().toUpperCase();
+  try {
+    const displayNames = new Intl.DisplayNames(
+      [navigator.language || "en-GB"],
+      { type: "region" }
+    );
+    return displayNames.of(code) || code;
+  } catch {
+    return code === "GB" ? "United Kingdom" : code;
+  }
+}
+
 function withTimeout(promise, ms, message) {
   let timerId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -267,6 +280,12 @@ export default function Search() {
   const [activeFilters, setActiveFilters] = useState(() => ({ ...EMPTY_FILTERS }));
   const [appliedFilters, setAppliedFilters] = useState(() => ({ ...EMPTY_FILTERS }));
   const [sortOrder, setSortOrder] = useState("default");
+  const [streamingRegion, setStreamingRegion] = useState(() => {
+    const code = String(window.__BURGRS_STREAMING_REGION__ || "GB")
+      .trim()
+      .toUpperCase();
+    return { code, label: countryLabel(code) };
+  });
   const loadMoreRef = useRef(null);
   const restoringSearchRef = useRef(false);
 
@@ -297,6 +316,28 @@ export default function Search() {
     !genreFilter &&
     !relationshipTypeFilter &&
     !settingFilter;
+
+  useEffect(() => {
+    function handleRegion(event) {
+      const code = String(
+        event?.detail?.country ||
+          window.__BURGRS_STREAMING_REGION__ ||
+          "GB"
+      )
+        .trim()
+        .toUpperCase();
+
+      setStreamingRegion({
+        code,
+        label: event?.detail?.label || countryLabel(code),
+      });
+    }
+
+    handleRegion();
+    document.addEventListener("burgrs:streaming-region", handleRegion);
+    return () =>
+      document.removeEventListener("burgrs:streaming-region", handleRegion);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -547,7 +588,7 @@ export default function Search() {
       setCurrentUserId(activeUserId);
 
       const params = new URLSearchParams({
-        region: "GB",
+        region: streamingRegion.code,
         page: String(page),
         sort: sortOverride,
         sortVersion: "4",
@@ -864,7 +905,7 @@ export default function Search() {
 
         {searchMode === "platform" ? (
           <p className="search-mode-help">
-            Platform results use UK streaming availability.
+            Platform results use {streamingRegion.label} streaming availability.
           </p>
         ) : null}
 
