@@ -328,6 +328,36 @@ function regionLabel(region) {
   return region === "GB" ? "the UK" : region;
 }
 
+function parseYearQuery(query) {
+  const normalized = String(query || "").trim().toLowerCase();
+
+  const exactMatch = normalized.match(/^(\d{4})$/);
+  if (exactMatch) {
+    const year = Number(exactMatch[1]);
+    if (year >= 1900 && year <= 2100) {
+      return {
+        startYear: year,
+        endYear: year,
+        label: String(year),
+      };
+    }
+  }
+
+  const decadeMatch = normalized.match(/^(\d{4})s$/);
+  if (decadeMatch) {
+    const decade = Number(decadeMatch[1]);
+    if (decade >= 1900 && decade <= 2090 && decade % 10 === 0) {
+      return {
+        startYear: decade,
+        endYear: decade + 9,
+        label: `${decade}s`,
+      };
+    }
+  }
+
+  return null;
+}
+
 export async function handler(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
@@ -347,9 +377,9 @@ export async function handler(event) {
       Number.isFinite(requestedPage) ? Math.floor(requestedPage) : 1
     );
 
-    if (!query || !["genre", "platform", "studio"].includes(mode)) {
+    if (!query || !["genre", "year", "platform", "studio"].includes(mode)) {
       return response(400, {
-        message: "Choose Genre, Platform or Studio and enter a search term.",
+        message: "Choose Genre, Year, Platform or Studio and enter a search term.",
       });
     }
 
@@ -406,6 +436,19 @@ export async function handler(event) {
       context.platformName = provider.provider_name;
     }
 
+    if (mode === "year") {
+      const yearRange = parseYearQuery(query);
+      if (!yearRange) {
+        return response(400, {
+          message: "Enter a four-digit year such as 1973, or a decade such as 1990s.",
+        });
+      }
+
+      discoverParams["first_air_date.gte"] = `${yearRange.startYear}-01-01`;
+      discoverParams["first_air_date.lte"] = `${yearRange.endYear}-12-31`;
+      context.yearLabel = yearRange.label;
+    }
+
     const discovered = await tmdbFetch("/discover/tv", discoverParams);
     const rawTotalPages = Number(discovered?.total_pages || 1);
     const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
@@ -416,7 +459,7 @@ export async function handler(event) {
     return response(200, {
       mode,
       query,
-      matched: context.genreName || context.platformName || query,
+      matched: context.genreName || context.platformName || context.yearLabel || query,
       page,
       totalPages,
       totalResults: Number(discovered?.total_results || results.length),
