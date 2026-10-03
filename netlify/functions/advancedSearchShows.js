@@ -14,7 +14,7 @@ function response(statusCode, body) {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=300",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
     },
     body: JSON.stringify(body),
   };
