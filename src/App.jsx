@@ -400,10 +400,6 @@ function AppLayout() {
       setProfileRefreshKey((value) => value + 1);
     };
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") refreshProfile();
-    };
-
     const handleProfileUpdated = (event) => {
       const nextProfile = event?.detail;
       if (
@@ -425,16 +421,10 @@ function AppLayout() {
       refreshProfile();
     };
 
-    window.addEventListener("pageshow", refreshProfile);
-    window.addEventListener("focus", refreshProfile);
     window.addEventListener("burgrs:profile-updated", handleProfileUpdated);
-    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      window.removeEventListener("pageshow", refreshProfile);
-      window.removeEventListener("focus", refreshProfile);
       window.removeEventListener("burgrs:profile-updated", handleProfileUpdated);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [session?.user?.id]);
 
