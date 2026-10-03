@@ -530,7 +530,12 @@ export default function Search() {
     }
   }
 
-  async function fetchCombinedSearch(filters, page = 1, append = false) {
+  async function fetchCombinedSearch(
+    filters,
+    page = 1,
+    append = false,
+    sortOverride = sortOrder
+  ) {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
@@ -544,8 +549,8 @@ export default function Search() {
       const params = new URLSearchParams({
         region: "GB",
         page: String(page),
-        sort: sortOrder,
-        sortVersion: "3",
+        sort: sortOverride,
+        sortVersion: "4",
       });
 
       Object.entries(filters || {}).forEach(([key, value]) => {
@@ -562,7 +567,7 @@ export default function Search() {
       const results = Array.isArray(data?.results) ? data.results : [];
       const combined = sortLoadedShows(
         append ? mergeUniqueShows(shows, results) : results,
-        sortOrder
+        sortOverride
       );
       const returnedTotal = Number(data?.totalResults);
       const safeTotal =
@@ -583,7 +588,11 @@ export default function Search() {
             .join(" + ")
       );
       setAdvancedPage(Number(data?.page || page));
-      setHasMore(Boolean(data?.hasMore));
+      const nextHasMore =
+        Boolean(data?.hasMore) ||
+        safeTotal > combined.length ||
+        results.length >= 20;
+      setHasMore(nextHasMore);
       setTotalResults(safeTotal);
       await markAlreadySaved(combined, activeUserId);
     } catch (err) {
@@ -644,7 +653,7 @@ export default function Search() {
       [searchMode]: trimmedQuery,
     };
 
-    await fetchCombinedSearch(nextFilters, 1, false);
+    await fetchCombinedSearch(nextFilters, 1, false, sortOrder);
   }
 
   async function handleLoadMore() {
@@ -657,7 +666,12 @@ export default function Search() {
       return;
     }
 
-    await fetchCombinedSearch(activeFilters, advancedPage + 1, true);
+    await fetchCombinedSearch(
+      activeFilters,
+      advancedPage + 1,
+      true,
+      sortOrder
+    );
   }
 
   useEffect(() => {
@@ -691,61 +705,17 @@ export default function Search() {
   ]);
 
   async function handleSortChange(nextSort) {
-    const previousSort = sortOrder;
+    if (nextSort === sortOrder || loading || loadingMore) return;
 
-    // Reorder the cards immediately in the browser. This makes the selected
-    // sort visible at once and does not depend on the follow-up API request.
     setSortOrder(nextSort);
+
+    // Give immediate feedback, then reload page 1 using the selected sort so
+    // pagination and infinite scroll remain tied to the same ordering.
     setShows((currentShows) => sortLoadedShows(currentShows, nextSort));
 
-    if (!hasActiveFilters(activeFilters) || loading || loadingMore) return;
+    if (!hasActiveFilters(activeFilters)) return;
 
-    try {
-      const activeUserId = await getCurrentUserId();
-      setCurrentUserId(activeUserId);
-      setLoading(true);
-      setError("");
-
-      const params = new URLSearchParams({
-        region: "GB",
-        page: "1",
-        sort: nextSort,
-        sortVersion: "3",
-      });
-
-      Object.entries(activeFilters).forEach(([key, value]) => {
-        const trimmed = String(value || "").trim();
-        if (trimmed) params.set(key, trimmed);
-      });
-
-      const res = await fetch(
-        `/.netlify/functions/advancedSearchShows?${params.toString()}`
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Could not sort results");
-
-      const results = sortLoadedShows(
-        Array.isArray(data?.results) ? data.results : [],
-        nextSort
-      );
-
-      setShows(results);
-      setAdvancedPage(Number(data?.page || 1));
-      setHasMore(Boolean(data?.hasMore));
-      const returnedTotal = Number(data?.totalResults);
-      setTotalResults(
-        Number.isFinite(returnedTotal) && returnedTotal > 0
-          ? Math.max(returnedTotal, results.length)
-          : results.length
-      );
-      await markAlreadySaved(results, activeUserId);
-    } catch (err) {
-      console.error("Sort search results failed:", err);
-      setError(err.message || "Could not sort results");
-      setSortOrder(previousSort);
-    } finally {
-      setLoading(false);
-    }
+    await fetchCombinedSearch(activeFilters, 1, false, nextSort);
   }
 
   useEffect(() => {
