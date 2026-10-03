@@ -95,6 +95,29 @@ function getTotalEpisodes(show) {
   );
 }
 
+
+function getRatingPercent(show) {
+  const raw = Number(
+    show?.rating_average ??
+      show?.vote_average ??
+      show?.rating ??
+      show?.score ??
+      0
+  );
+
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  if (raw <= 10) return Math.round(raw * 10);
+  if (raw <= 100) return Math.round(raw);
+  return null;
+}
+
+function getRatingSource(show) {
+  const source = String(show?.source || "").trim().toLowerCase();
+  if (source === "tmdb") return "TMDB";
+  if (source === "tvdb") return "TVDB";
+  return "Source";
+}
+
 function getResultKey(show) {
   if (show?.tvdb_id) return `tvdb:${show.tvdb_id}`;
   if (show?.tmdb_id) return `tmdb:${show.tmdb_id}`;
@@ -802,6 +825,8 @@ export default function Search() {
             const detailHref = getDetailHref(show, savedByTvdb, savedByTmdb);
             const backdrop = getBackdrop(show);
             const poster = getPoster(show);
+            const ratingPercent = getRatingPercent(show);
+            const ratingSource = getRatingSource(show);
             const firstAired = getFirstAired(show);
             const totalSeasons = getTotalSeasons(show);
             const totalEpisodes = getTotalEpisodes(show);
@@ -841,6 +866,15 @@ export default function Search() {
                     ) : (
                       <div className="search-result-poster search-result-poster-placeholder" />
                     )}
+                    {ratingPercent ? (
+                      <span
+                        className="search-result-rating-badge"
+                        aria-label={`${ratingSource} rating ${ratingPercent}%`}
+                        title={`${ratingSource} rating`}
+                      >
+                        {ratingPercent}%
+                      </span>
+                    ) : null}
                   </Link>
 
                   <div className="search-result-content">
@@ -885,15 +919,6 @@ export default function Search() {
                         <div className="search-result-meta-row">
                           <span className="search-result-meta-label">Genre</span>
                           <span className="search-result-meta-value">{genres}</span>
-                        </div>
-                      ) : null}
-
-                      {Number(show.rating_average) > 0 ? (
-                        <div className="search-result-meta-row">
-                          <span className="search-result-meta-label">Rating</span>
-                          <span className="search-result-meta-value">
-                            {Number(show.rating_average).toFixed(1)}/10
-                          </span>
                         </div>
                       ) : null}
 
