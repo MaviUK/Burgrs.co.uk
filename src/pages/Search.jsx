@@ -243,6 +243,11 @@ export default function Search() {
     [searchMode]
   );
 
+  const displayedShows = useMemo(
+    () => sortLoadedShows(shows, sortOrder),
+    [shows, sortOrder]
+  );
+
   const isPureNetworkBrowse =
     Boolean(networkFilter) &&
     !genreFilter &&
@@ -415,6 +420,7 @@ export default function Search() {
         region: "GB",
         page: String(page),
         sort: sortOrder,
+        sortVersion: "3",
       });
 
       Object.entries(filters || {}).forEach(([key, value]) => {
@@ -576,6 +582,7 @@ export default function Search() {
         region: "GB",
         page: "1",
         sort: nextSort,
+        sortVersion: "3",
       });
 
       Object.entries(activeFilters).forEach(([key, value]) => {
@@ -812,7 +819,7 @@ export default function Search() {
         ) : null}
 
         <div className="search-results-list">
-          {shows.map((show) => {
+          {displayedShows.map((show) => {
             const resultKey = getResultKey(show);
             const savedByTvdb = Boolean(
               show.tvdb_id && savedTvdbIds.has(String(show.tvdb_id))
