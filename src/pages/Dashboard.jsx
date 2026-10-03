@@ -346,7 +346,8 @@ async function fetchSavedShowLibrary(userId) {
         poster_url,
         backdrop_url,
         first_aired,
-        next_aired
+        next_aired,
+        watched_minutes
       `)
       .eq("user_id", userId)
       .range(from, from + pageSize - 1);
@@ -424,32 +425,6 @@ async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
       done = rows.length < pageSize;
       from += pageSize;
     }
-  }
-
-  return allRows;
-}
-
-async function fetchWatchProgressSummary(userId) {
-  if (!userId) return [];
-
-  const allRows = [];
-  const pageSize = 1000;
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("user_show_watch_progress")
-      .select("show_id, watched_minutes")
-      .eq("user_id", userId)
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-
-    const rows = data || [];
-    allRows.push(...rows);
-
-    if (rows.length < pageSize) break;
-    from += pageSize;
   }
 
   return allRows;
@@ -1482,6 +1457,7 @@ export default function Dashboard() {
           backdrop_url: row.backdrop_url || null,
           first_aired: row.first_aired || null,
           next_aired: row.next_aired || null,
+          watched_minutes: Number(row.watched_minutes || 0),
         }));
 
         const showIds = normalizedShows
@@ -1502,7 +1478,6 @@ export default function Dashboard() {
           watchingWatchedRows,
           watchingEpisodes,
           upcomingEpisodes,
-          watchProgressSummary,
           trending,
           premieringSoon,
           newsStories,
@@ -1519,7 +1494,6 @@ export default function Dashboard() {
           showIds.length
             ? fetchUpcomingEpisodesForShowIds(showIds)
             : Promise.resolve([]),
-          fetchWatchProgressSummary(user.id),
           fetchTrendingShows().catch(() => []),
           fetchPremieringSoonShows().catch(() => []),
           fetchLatestNews(),
@@ -1547,8 +1521,8 @@ export default function Dashboard() {
         });
         const watchedRows = Array.from(watchedMap.values());
 
-        const watchedMinutesTotal = (watchProgressSummary || []).reduce(
-          (total, row) => total + Number(row.watched_minutes || 0),
+        const watchedMinutesTotal = normalizedShows.reduce(
+          (total, show) => total + Number(show.watched_minutes || 0),
           0
         );
 
