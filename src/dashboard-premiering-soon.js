@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "./lib/savedShowLibrary";
 
 const CACHE_KEY = "trackt_premiering_s01e01_v5";
 const CACHE_DURATION = 1000 * 60 * 30;
@@ -94,7 +95,7 @@ async function loadShows() {
   return shows;
 }
 
-async function getSavedIds() {
+async function getSavedIds(shows = []) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -102,30 +103,17 @@ async function getSavedIds() {
   const empty = { tmdb: new Set(), tvdb: new Set() };
   if (!user) return empty;
 
-  const { data, error } = await supabase
-    .from("user_shows_new")
-    .select("shows!inner(tmdb_id,tvdb_id)")
-    .eq("user_id", user.id);
-
-  if (error) {
+  try {
+    const rows = await fetchSavedShowRows(user.id, {
+      tvdbIds: shows.map((show) => show?.tvdb_id).filter(Boolean),
+      tmdbIds: shows.map((show) => show?.tmdb_id).filter(Boolean),
+    });
+    const saved = getSavedExternalIdSets(rows);
+    return { tmdb: saved.tmdb, tvdb: saved.tvdb };
+  } catch (error) {
     console.warn("Failed loading saved premiere badges", error);
     return empty;
   }
-
-  return {
-    tmdb: new Set(
-      (data || [])
-        .map((row) => row?.shows?.tmdb_id)
-        .filter(Boolean)
-        .map(String)
-    ),
-    tvdb: new Set(
-      (data || [])
-        .map((row) => row?.shows?.tvdb_id)
-        .filter(Boolean)
-        .map(String)
-    ),
-  };
 }
 
 function findSection() {
@@ -210,7 +198,8 @@ async function enhanceSection() {
   section.appendChild(loading);
 
   try {
-    const [shows, savedIds] = await Promise.all([loadShows(), getSavedIds()]);
+    const shows = await loadShows();
+    const savedIds = await getSavedIds(shows);
 
     loading.remove();
 
