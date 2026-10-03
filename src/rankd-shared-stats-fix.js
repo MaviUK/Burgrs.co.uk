@@ -34,36 +34,22 @@ async function loadOverallStats(showIds) {
 
   if (!ids.length) return statsByShow;
 
-  const [asA, asB] = await Promise.all([
-    supabase
-      .from("rankd_matchups")
-      .select("show_a_id, show_a_wins, times_matched")
-      .in("show_a_id", ids),
-    supabase
-      .from("rankd_matchups")
-      .select("show_b_id, show_b_wins, times_matched")
-      .in("show_b_id", ids),
-  ]);
-
-  if (asA.error) throw asA.error;
-  if (asB.error) throw asB.error;
-
-  (asA.data || []).forEach((row) => {
-    const id = String(row.show_a_id || "");
-    if (!statsByShow[id]) return;
-    statsByShow[id].wins += Number(row.show_a_wins || 0);
-    statsByShow[id].total += Number(row.times_matched || 0);
+  const { data, error } = await supabase.rpc("get_rankd_overall_stats", {
+    p_show_ids: ids,
   });
 
-  (asB.data || []).forEach((row) => {
-    const id = String(row.show_b_id || "");
-    if (!statsByShow[id]) return;
-    statsByShow[id].wins += Number(row.show_b_wins || 0);
-    statsByShow[id].total += Number(row.times_matched || 0);
-  });
+  if (error) throw error;
 
-  Object.keys(statsByShow).forEach((id) => {
-    statsByShow[id].percent = getPercent(statsByShow[id].wins, statsByShow[id].total);
+  (data || []).forEach((row) => {
+    const showId = String(row.show_id || "");
+    if (!statsByShow[showId]) return;
+    const wins = Number(row.wins || 0);
+    const total = Number(row.total || 0);
+    statsByShow[showId] = {
+      wins,
+      total,
+      percent: getPercent(wins, total),
+    };
   });
 
   return statsByShow;
