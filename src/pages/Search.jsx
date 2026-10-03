@@ -8,6 +8,7 @@ import "./Search.css";
 const SEARCH_MODES = [
   { id: "title", label: "Title", placeholder: "Search for a show" },
   { id: "genre", label: "Genre", placeholder: "e.g. Crime, Comedy, Sci-Fi" },
+  { id: "year", label: "Year", placeholder: "e.g. 1973 or 1990s" },
   { id: "platform", label: "Platform", placeholder: "e.g. Netflix, Disney+, BBC iPlayer" },
   { id: "studio", label: "Studio", placeholder: "e.g. HBO, A24, Warner Bros" },
 ];
