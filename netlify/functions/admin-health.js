@@ -1,17 +1,17 @@
-function jsonResponse(statusCode, body) {
-  return {
-    statusCode,
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
     },
-    body: JSON.stringify(body),
-  };
+  });
 }
 
 async function readJson(response) {
   const text = await response.text();
   if (!text) return null;
+
   try {
     return JSON.parse(text);
   } catch {
@@ -31,52 +31,44 @@ async function verifyUser({ supabaseUrl, anonKey, accessToken }) {
   if (!response.ok || !data?.id) {
     throw new Error("Your session could not be verified.");
   }
+
   return data;
 }
 
-export async function handler(event) {
-  if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 204,
-      headers: {
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-      },
-      body: "",
-    };
-  }
-
-  if (event.httpMethod !== "GET") {
-    return jsonResponse(405, { error: "Method not allowed." });
+export default async (request) => {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl = Netlify.env.get("SUPABASE_URL");
     const anonKey =
-      process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+      Netlify.env.get("SUPABASE_ANON_KEY") ||
+      Netlify.env.get("VITE_SUPABASE_ANON_KEY");
     const serviceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+      Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+      Netlify.env.get("SUPABASE_SECRET_KEY");
 
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      throw new Error("Admin health server configuration is incomplete.");
+      throw new Error("Admin server configuration is incomplete.");
     }
 
-    const authorization =
-      event.headers.authorization || event.headers.Authorization || "";
+    const authorization = request.headers.get("authorization") || "";
     const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
+
     if (!accessToken) {
-      return jsonResponse(401, { error: "You must be logged in." });
+      return jsonResponse({ error: "You must be logged in." }, 401);
     }
 
     const user = await verifyUser({ supabaseUrl, anonKey, accessToken });
     const burgrsTvId = "add17d5c-c8fd-4430-904f-271342100bf9";
 
     if (String(user.id) !== burgrsTvId) {
-      return jsonResponse(403, { error: "Burgrs TV admin access required." });
+      return jsonResponse({ error: "Burgrs TV admin access required." }, 403);
     }
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/get_admin_health_snapshot`,
+      `${supabaseUrl}/rest/v1/rpc/get_admin_dashboard_snapshot`,
       {
         method: "POST",
         headers: {
@@ -90,18 +82,21 @@ export async function handler(event) {
     );
 
     const data = await readJson(response);
+
     if (!response.ok) {
-      throw new Error(data?.message || "Could not load admin health.");
+      throw new Error(data?.message || "Could not load admin dashboard.");
     }
 
-    return jsonResponse(200, {
+    return jsonResponse({
       ok: true,
-      health: data,
+      dashboard: data,
+      health: data?.health || null,
     });
   } catch (error) {
-    console.error("Admin health failed:", error);
-    return jsonResponse(500, {
-      error: error?.message || "Could not load admin health.",
-    });
+    console.error("Admin dashboard failed:", error);
+    return jsonResponse(
+      { error: error?.message || "Could not load admin dashboard." },
+      500
+    );
   }
-}
+};
