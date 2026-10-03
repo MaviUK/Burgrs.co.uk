@@ -322,6 +322,46 @@ function normalizeEpisode(ep) {
   };
 }
 
+async function fetchSavedShowLibrary(userId) {
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("my_show_library_flat")
+      .select(`
+        id,
+        user_id,
+        show_id,
+        watch_status,
+        archived_at,
+        added_at,
+        created_at,
+        tvdb_id,
+        tmdb_id,
+        name,
+        overview,
+        status,
+        poster_url,
+        backdrop_url,
+        first_aired
+      `)
+      .eq("user_id", userId)
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
 async function fetchEpisodesForShowIds(showIds) {
   if (!showIds.length) return [];
 
@@ -1330,30 +1370,7 @@ export default function Dashboard() {
           return;
         }
 
-        const { data: showRows, error: showsError } = await supabase
-          .from("user_shows_new")
-          .select(`
-            id,
-            user_id,
-            show_id,
-            watch_status,
-            archived_at,
-            added_at,
-            created_at,
-            shows!inner(
-              id,
-              tvdb_id,
-              tmdb_id,
-              name,
-              status,
-              poster_url,
-              backdrop_url,
-              first_aired
-            )
-          `)
-          .eq("user_id", user.id);
-
-        if (showsError) throw showsError;
+        const showRows = await fetchSavedShowLibrary(user.id);
 
         const normalizedShows = (showRows || []).map((row) => ({
           id: row.id,
@@ -1363,13 +1380,13 @@ export default function Dashboard() {
           archived_at: row.archived_at || null,
           added_at: row.added_at || null,
           created_at: row.created_at || null,
-          tvdb_id: row.shows?.tvdb_id || null,
-          tmdb_id: row.shows?.tmdb_id || null,
-          show_name: row.shows?.name || "Unknown title",
-          status: row.shows?.status || null,
-          poster_url: row.shows?.poster_url || null,
-          backdrop_url: row.shows?.backdrop_url || null,
-          first_aired: row.shows?.first_aired || null,
+          tvdb_id: row.tvdb_id || null,
+          tmdb_id: row.tmdb_id || null,
+          show_name: row.name || "Unknown title",
+          status: row.status || null,
+          poster_url: row.poster_url || null,
+          backdrop_url: row.backdrop_url || null,
+          first_aired: row.first_aired || null,
         }));
 
         const showIds = normalizedShows
