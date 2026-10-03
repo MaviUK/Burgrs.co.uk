@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "./lib/savedShowLibrary";
 
 const CHAT_BUTTON_ATTR = "data-creator-chats-stat";
 const CHAT_PANEL_ATTR = "data-creator-chats-panel";
@@ -178,16 +179,12 @@ async function loadCreatorChats(slug, expectedRouteKey) {
   const viewer = authResult?.data?.user || null;
   let nextSavedShowIds = new Set();
 
-  if (viewer?.id) {
-    const { data: savedRows, error: savedError } = await supabase
-      .from("user_shows_new")
-      .select("show_id")
-      .eq("user_id", viewer.id);
-
-    if (!savedError) {
-      nextSavedShowIds = new Set(
-        (savedRows || []).map((row) => String(row.show_id)).filter(Boolean)
-      );
+  if (viewer?.id && showIds.length) {
+    try {
+      const savedRows = await fetchSavedShowRows(viewer.id, { showIds });
+      nextSavedShowIds = getSavedExternalIdSets(savedRows).show;
+    } catch (savedError) {
+      console.warn("Failed checking saved chat shows", savedError);
     }
   }
 
