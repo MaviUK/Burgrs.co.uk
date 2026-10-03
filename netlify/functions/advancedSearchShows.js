@@ -549,13 +549,52 @@ export async function handler(event) {
     };
 
     if (filters.title) {
+      const requestedTmdbPage = Math.min(MAX_TMDB_PAGE, page);
       const searched = await tmdbFetch("/search/tv", {
         query: filters.title,
-        page: String(Math.min(MAX_TMDB_PAGE, page)),
+        page: String(requestedTmdbPage),
         include_adult: "false",
       });
 
+      const rawTotalPages = Math.min(
+        MAX_TMDB_PAGE,
+        Math.max(1, Number(searched?.total_pages || 1))
+      );
+      const globalSortPageLimit = provider || company ? 5 : 25;
+      const canGloballySort =
+        sort !== "default" && rawTotalPages <= globalSortPageLimit;
+
       let rawResults = Array.isArray(searched?.results) ? searched.results : [];
+
+      if (canGloballySort && rawTotalPages > 1) {
+        const otherPages = Array.from(
+          { length: rawTotalPages },
+          (_, index) => index + 1
+        ).filter((pageNumber) => pageNumber !== requestedTmdbPage);
+
+        const pageResponses = await Promise.all(
+          otherPages.map((pageNumber) =>
+            tmdbFetch("/search/tv", {
+              query: filters.title,
+              page: String(pageNumber),
+              include_adult: "false",
+            })
+          )
+        );
+
+        rawResults = [
+          ...rawResults,
+          ...pageResponses.flatMap((result) =>
+            Array.isArray(result?.results) ? result.results : []
+          ),
+        ];
+
+        const uniqueResults = new Map();
+        rawResults.forEach((item) => {
+          if (item?.id) uniqueResults.set(Number(item.id), item);
+        });
+        rawResults = Array.from(uniqueResults.values());
+      }
 
       if (genre) {
         rawResults = rawResults.filter((item) =>
@@ -606,11 +645,38 @@ export async function handler(event) {
 
       rawResults = sortTitleResults(rawResults, sort);
 
-      const rawTotalPages = Number(searched?.total_pages || 1);
-      const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
       const hasRefinements = Boolean(
         filters.genre || filters.year || filters.platform || filters.studio
       );
+
+      if (canGloballySort) {
+        const totalFilteredResults = rawResults.length;
+        const totalPages = Math.max(1, Math.ceil(totalFilteredResults / PAGE_SIZE));
+        const startIndex = (page - 1) * PAGE_SIZE;
+        const pagedRawResults = rawResults.slice(
+          startIndex,
+          startIndex + PAGE_SIZE
+        );
+        const results = pagedRawResults
+          .map((item) => normalizeCombinedResult(item, context, genreMap))
+          .filter((item) => item.tmdb_id);
+
+        return response(200, {
+          mode: "combined",
+          query: filters.title,
+          matched: Object.values(appliedFilters).join(" + "),
+          appliedFilters,
+          page,
+          totalPages,
+          totalResults: totalFilteredResults,
+          hasMore: page < totalPages,
+          results,
+          matchType: "combined-title-global-sort",
+          sort,
+        });
+      }
+
+      const totalPages = rawTotalPages;
       const results = rawResults
         .map((item) => normalizeCombinedResult(item, context, genreMap))
         .filter((item) => item.tmdb_id);
