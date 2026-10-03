@@ -367,11 +367,9 @@ async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
 
     while (!done) {
       const { data, error } = await supabase
-        .from("watched_episodes")
-        .select("episode_id, watched_at, episodes!inner(show_id)")
-        .eq("user_id", userId)
-        .in("episodes.show_id", batch)
-        .order("watched_at", { ascending: false })
+        .rpc("get_watched_episode_rows_for_shows", {
+          p_show_ids: batch,
+        })
         .range(from, from + pageSize - 1);
 
       if (error) throw error;
