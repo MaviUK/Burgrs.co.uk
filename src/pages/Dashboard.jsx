@@ -430,44 +430,19 @@ async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
   return allRows;
 }
 
-async function fetchUpcomingEpisodesForShowIds(showIds) {
-  if (!showIds.length) return [];
+async function fetchUpcomingEpisodesForUser(userId) {
+  if (!userId) return [];
 
-  const today = startOfToday();
-  const end = new Date(today);
-  end.setDate(end.getDate() + 8);
+  const { data, error } = await supabase
+    .from("my_upcoming_episodes")
+    .select("id, show_id, season_number, episode_number, name, aired_date, runtime_minutes")
+    .eq("user_id", userId)
+    .order("aired_date", { ascending: true })
+    .order("season_number", { ascending: true })
+    .order("episode_number", { ascending: true });
 
-  const startKey = [
-    today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    String(today.getDate()).padStart(2, "0"),
-  ].join("-");
-  const endKey = [
-    end.getFullYear(),
-    String(end.getMonth() + 1).padStart(2, "0"),
-    String(end.getDate()).padStart(2, "0"),
-  ].join("-");
-
-  const rows = [];
-
-  for (const batch of chunkArray(showIds, 100)) {
-    const { data, error } = await supabase
-      .from("episodes")
-      .select("id, show_id, season_number, episode_number, name, aired_date, runtime_minutes")
-      .in("show_id", batch)
-      .gt("season_number", 0)
-      .gt("episode_number", 0)
-      .gte("aired_date", startKey)
-      .lt("aired_date", endKey)
-      .order("aired_date", { ascending: true })
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true });
-
-    if (error) throw error;
-    rows.push(...(data || []));
-  }
-
-  return rows;
+  if (error) throw error;
+  return data || [];
 }
 
 async function fetchWatchedEpisodeRowsForEpisodeIds(userId, episodeIds) {
@@ -1491,9 +1466,7 @@ export default function Dashboard() {
           watchingShowIds.length
             ? fetchEpisodesForShowIds(watchingShowIds)
             : Promise.resolve([]),
-          showIds.length
-            ? fetchUpcomingEpisodesForShowIds(showIds)
-            : Promise.resolve([]),
+          fetchUpcomingEpisodesForUser(user.id),
           fetchTrendingShows().catch(() => []),
           fetchPremieringSoonShows().catch(() => []),
           fetchLatestNews(),
