@@ -1318,7 +1318,7 @@ export default function Rankd() {
     );
   }
 
-  if (eligibleShows.length < 2 || currentPair.length < 2) {
+  if (eligibleShows.length < 2 || (isSharedPage && currentPair.length < 2)) {
     return (
       <div className="page rankd-page">
         <div className="page-shell">
@@ -1346,17 +1346,18 @@ export default function Rankd() {
     );
   }
 
-  const leftWinPercent = getWinPercent(matchupStats, currentPair[0].show_id);
-  const rightWinPercent = getWinPercent(matchupStats, currentPair[1].show_id);
-  const leftWins = getWinCount(matchupStats, currentPair[0].show_id);
-  const rightWins = getWinCount(matchupStats, currentPair[1].show_id);
-  const leftOverallStats = getOverallStats(overallStatsByShow, currentPair[0].show_id);
-  const rightOverallStats = getOverallStats(overallStatsByShow, currentPair[1].show_id);
+  const hasCurrentPair = currentPair.length === 2;
+  const leftWinPercent = hasCurrentPair ? getWinPercent(matchupStats, currentPair[0].show_id) : 0;
+  const rightWinPercent = hasCurrentPair ? getWinPercent(matchupStats, currentPair[1].show_id) : 0;
+  const leftWins = hasCurrentPair ? getWinCount(matchupStats, currentPair[0].show_id) : 0;
+  const rightWins = hasCurrentPair ? getWinCount(matchupStats, currentPair[1].show_id) : 0;
+  const leftOverallStats = hasCurrentPair ? getOverallStats(overallStatsByShow, currentPair[0].show_id) : { percent: 0, wins: 0 };
+  const rightOverallStats = hasCurrentPair ? getOverallStats(overallStatsByShow, currentPair[1].show_id) : { percent: 0, wins: 0 };
 
   return (
     <div className="page rankd-page">
       <div className="page-shell">
-        {!isSharedPage ? (
+        {!isSharedPage && hasCurrentPair ? (
           <div className="rankd-matchup-number">
             Matchup #{Math.floor(leaderboard.reduce((total, show) => total + Number(show.rank_comparisons || 0), 0) / 2) + 1}
           </div>
@@ -1390,6 +1391,7 @@ export default function Rankd() {
         ) : null}
 
         <div className="rankd-main-grid">
+          {hasCurrentPair ? (
           <div id="rankd-top" className="section-card rankd-battle-shell">
             <div className="rankd-battle-layout">
               <RankCard
@@ -1484,6 +1486,16 @@ export default function Rankd() {
               </div>
             ) : null}
           </div>
+          ) : (
+            <div id="rankd-top" className="section-card rankd-filter-no-matchup">
+              <strong>{leaderboard.length === 1 ? "1 show matches this filter" : "No shows match this filter"}</strong>
+              <span>
+                {leaderboard.length === 1
+                  ? "The matching show is listed below. Rank'd needs at least 2 matching shows for a head-to-head matchup."
+                  : "Try changing or clearing the filters to see matching shows."}
+              </span>
+            </div>
+          )}
 
           <div className="section-card rankd-leaderboard-card">
             <div className="rankd-leaderboard-header">
