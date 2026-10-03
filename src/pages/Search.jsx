@@ -139,9 +139,10 @@ function sortLoadedShows(items, sort) {
   if (sort === "highest-rated") {
     return results.sort((a, b) => {
       const ratingDiff =
-        Number(b?.rating_average || 0) - Number(a?.rating_average || 0);
+        Number(getRatingPercent(b) || 0) - Number(getRatingPercent(a) || 0);
       if (ratingDiff) return ratingDiff;
-      return Number(b?.rating_count || 0) - Number(a?.rating_count || 0);
+      return Number(b?.rating_count || b?.vote_count || 0) -
+        Number(a?.rating_count || a?.vote_count || 0);
     });
   }
 
