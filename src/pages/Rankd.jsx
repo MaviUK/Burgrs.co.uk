@@ -618,6 +618,16 @@ export default function Rankd() {
     [eligibleShows]
   );
 
+  const availableDecades = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          availableYears.map((year) => Math.floor(Number(year) / 10) * 10)
+        )
+      ).sort((a, b) => b - a),
+    [availableYears]
+  );
+
   const activeFilters = useMemo(
     () => ({
       genre: genreFilter,
@@ -1573,11 +1583,12 @@ export default function Rankd() {
                       >
                         <option value="">Any time</option>
                         <option value="this_year">This year</option>
-                        <option value="decade:2020">2020s</option>
-                        <option value="decade:2010">2010s</option>
-                        <option value="decade:2000">2000s</option>
-                        <option value="decade:1990">1990s</option>
-                        {availableYears.slice(0, 20).map((year) => (
+                        {availableDecades.map((decade) => (
+                          <option key={`decade:${decade}`} value={`decade:${decade}`}>
+                            {decade}s
+                          </option>
+                        ))}
+                        {availableYears.map((year) => (
                           <option key={year} value={`year:${year}`}>
                             {year}
                           </option>
