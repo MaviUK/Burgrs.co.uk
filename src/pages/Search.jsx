@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatDate } from "../lib/date";
 import { supabase } from "../lib/supabase";
@@ -150,6 +150,7 @@ export default function Search() {
   const [totalResults, setTotalResults] = useState(0);
   const [activeFilters, setActiveFilters] = useState(() => ({ ...EMPTY_FILTERS }));
   const [appliedFilters, setAppliedFilters] = useState(() => ({ ...EMPTY_FILTERS }));
+  const loadMoreRef = useRef(null);
 
   const titleQuery = searchParams.get("q") || "";
   const genreFilter = searchParams.get("genre") || "";
@@ -447,6 +448,35 @@ export default function Search() {
 
     await fetchCombinedSearch(activeFilters, advancedPage + 1, true);
   }
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore || !shows.length) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting && !loading && !loadingMore) {
+          handleLoadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "350px 0px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    hasMore,
+    shows.length,
+    loading,
+    loadingMore,
+    advancedPage,
+    activeFilters,
+  ]);
 
   function changeMode(nextMode) {
     if (nextMode === searchMode) return;
@@ -760,14 +790,13 @@ export default function Search() {
         </div>
 
         {hasMore && shows.length > 0 ? (
-          <button
-            type="button"
-            className="search-load-more-button"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
+          <div
+            ref={loadMoreRef}
+            className="search-auto-load-sentinel"
+            aria-live="polite"
           >
-            {loadingMore ? "Loading more shows..." : "Load more shows"}
-          </button>
+            {loadingMore ? "Loading more shows..." : ""}
+          </div>
         ) : null}
       </div>
     </div>
