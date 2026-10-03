@@ -526,6 +526,7 @@ function AppLayout() {
           <Route path="/actor/:name" element={<ProtectedRoute session={session}><ActorPage /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute session={session}><CalendarPage /></ProtectedRoute>} />
           <Route path="/taste-match" element={<ProtectedRoute session={session}><TasteMatchDiscovery /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute session={session}><AdminHealth /></ProtectedRoute>} />
           <Route path="/admin/health" element={<ProtectedRoute session={session}><AdminHealth /></ProtectedRoute>} />
           <Route path="/profile/edit" element={<ProtectedRoute session={session}><ProfileEditMerged /></ProtectedRoute>} />
           <Route path="/rankd" element={<ProtectedRoute session={session}><Rankd /></ProtectedRoute>} />
