@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { formatDate } from "../lib/date";
 import { supabase } from "../lib/supabase";
 import { addShowToUserList } from "../lib/userShows";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "../lib/savedShowLibrary";
 import "./Search.css";
 
 const SEARCH_MODES = [
@@ -488,37 +489,27 @@ export default function Search() {
       return;
     }
 
-    const { data, error: savedError } = await supabase
-      .from("user_shows_new")
-      .select("shows!inner(tvdb_id, tmdb_id)")
-      .eq("user_id", userId);
+    const tvdbIds = (results || [])
+      .map((show) => show?.tvdb_id)
+      .filter(Boolean);
+    const tmdbIds = (results || [])
+      .map((show) => show?.tmdb_id)
+      .filter(Boolean);
 
-    if (savedError) {
+    try {
+      const rows = await fetchSavedShowRows(userId, { tvdbIds, tmdbIds });
+      const saved = getSavedExternalIdSets(rows);
+
+      const latestUserId = await getCurrentUserId();
+      if (latestUserId !== userId) return;
+
+      setSavedTvdbIds(saved.tvdb);
+      setSavedTmdbIds(saved.tmdb);
+    } catch (savedError) {
       console.error("Failed checking saved shows:", savedError);
       setSavedTvdbIds(new Set());
       setSavedTmdbIds(new Set());
-      return;
     }
-
-    const latestUserId = await getCurrentUserId();
-    if (latestUserId !== userId) return;
-
-    setSavedTvdbIds(
-      new Set(
-        (data || [])
-          .map((row) => row?.shows?.tvdb_id)
-          .filter(Boolean)
-          .map(String)
-      )
-    );
-    setSavedTmdbIds(
-      new Set(
-        (data || [])
-          .map((row) => row?.shows?.tmdb_id)
-          .filter(Boolean)
-          .map(String)
-      )
-    );
   }
 
   useEffect(() => {
