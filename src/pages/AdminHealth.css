@@ -12,12 +12,23 @@
   align-items: flex-start;
 }
 
+.admin-health-header > div {
+  min-width: 0;
+}
+
 .admin-health-header > div > span {
   color: #f9a8d4;
   font-size: 10px;
   font-weight: 950;
   letter-spacing: .09em;
   text-transform: uppercase;
+}
+
+.admin-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .admin-health-header h1 {
@@ -34,6 +45,7 @@
 }
 
 .admin-health-header button {
+  flex: 0 0 auto;
   border: 1px solid rgba(148,163,184,.18);
   border-radius: 999px;
   background: rgba(255,255,255,.05);
@@ -43,14 +55,49 @@
   font-weight: 900;
 }
 
+.admin-health-header button:disabled {
+  opacity: .55;
+}
+
+.admin-health-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 15px -4px 0;
+  padding: 0 4px 2px;
+}
+
+.admin-health-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-health-tabs button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 999px;
+  background: rgba(15,23,42,.78);
+  color: #94a3b8;
+  padding: 8px 11px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.admin-health-tabs button.is-active {
+  border-color: rgba(249,168,212,.32);
+  background: rgba(190,24,93,.18);
+  color: #fdf2f8;
+}
+
 .admin-health-grid {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .admin-health-metric {
+  min-width: 0;
   padding: 11px 9px;
   border: 1px solid rgba(148,163,184,.12);
   border-radius: 15px;
@@ -58,23 +105,38 @@
 }
 
 .admin-health-metric strong,
-.admin-health-metric span { display:block; }
+.admin-health-metric span,
+.admin-health-metric small {
+  display: block;
+}
 
 .admin-health-metric strong {
   font-size: 19px;
+  line-height: 1;
 }
 
 .admin-health-metric span {
-  margin-top: 4px;
+  margin-top: 5px;
   color: #94a3b8;
   font-size: 8px;
   font-weight: 850;
   line-height: 1.2;
 }
 
+.admin-health-metric small {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 7px;
+}
+
 .admin-health-metric.is-warn {
   border-color: rgba(251,191,36,.28);
   background: rgba(120,53,15,.14);
+}
+
+.admin-health-metric.is-danger {
+  border-color: rgba(248,113,113,.3);
+  background: rgba(127,29,29,.16);
 }
 
 .admin-health-metric.is-ok {
@@ -102,6 +164,7 @@
 }
 
 .admin-health-detail-grid > div {
+  min-width: 0;
   padding: 9px;
   border-radius: 12px;
   background: rgba(255,255,255,.035);
@@ -109,90 +172,256 @@
 
 .admin-health-detail-grid span,
 .admin-health-detail-grid strong {
-  display:block;
+  display: block;
 }
 
 .admin-health-detail-grid span {
-  color:#94a3b8;
-  font-size:8px;
-  font-weight:850;
+  color: #94a3b8;
+  font-size: 8px;
+  font-weight: 850;
 }
 
 .admin-health-detail-grid strong {
-  margin-top:4px;
-  font-size:10px;
+  margin-top: 4px;
+  font-size: 10px;
+  overflow-wrap: anywhere;
 }
 
 .admin-health-section-head {
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  align-items:end;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: end;
 }
 
 .admin-health-section-head span {
-  color:#94a3b8;
-  font-size:8px;
+  color: #94a3b8;
+  font-size: 8px;
+  text-align: right;
 }
 
-.admin-health-list {
-  display:grid;
-  gap:7px;
-  margin-top:10px;
+.admin-health-list,
+.admin-attention-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
 }
 
-.admin-health-row {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:10px;
-  padding:9px;
-  border-radius:12px;
-  background:rgba(255,255,255,.035);
-  color:inherit;
-  text-decoration:none;
+.admin-health-row,
+.admin-attention-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 9px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+  color: inherit;
+  text-decoration: none;
 }
 
 .admin-health-row strong,
 .admin-health-row span,
-.admin-health-row em {
-  display:block;
+.admin-health-row em,
+.admin-attention-item strong,
+.admin-attention-item span {
+  display: block;
 }
 
-.admin-health-row strong { font-size:11px; }
-.admin-health-row span {
-  margin-top:3px;
-  color:#94a3b8;
-  font-size:8px;
-  line-height:1.3;
+.admin-health-row strong,
+.admin-attention-item strong {
+  font-size: 11px;
 }
+
+.admin-health-row span,
+.admin-attention-item span {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
 .admin-health-row em {
-  margin-top:4px;
-  color:#fecaca;
-  font-size:8px;
-  font-style:normal;
-  line-height:1.3;
-  overflow-wrap:anywhere;
+  margin-top: 4px;
+  color: #fecaca;
+  font-size: 8px;
+  font-style: normal;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
+
 .admin-health-row small {
-  color:#64748b;
-  font-size:8px;
-  white-space:nowrap;
+  color: #64748b;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.admin-attention-item.is-warn {
+  border: 1px solid rgba(251,191,36,.16);
+  background: rgba(120,53,15,.11);
+}
+
+.admin-attention-item.is-danger {
+  border: 1px solid rgba(248,113,113,.18);
+  background: rgba(127,29,29,.13);
+}
+
+.admin-attention-item.is-ok {
+  border: 1px solid rgba(34,197,94,.13);
+  background: rgba(20,83,45,.1);
+}
+
+.admin-attention-button {
+  width: 100%;
+  border: 1px solid rgba(148,163,184,.12);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-state-pill {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 0;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 999px;
+  padding: 5px 7px;
+  background: rgba(255,255,255,.04);
+  color: #cbd5e1 !important;
+  font-size: 7px !important;
+  font-weight: 950;
+  line-height: 1 !important;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.admin-state-pill.is-ok {
+  border-color: rgba(34,197,94,.24);
+  background: rgba(20,83,45,.18);
+  color: #bbf7d0 !important;
+}
+
+.admin-state-pill.is-warn {
+  border-color: rgba(251,191,36,.26);
+  background: rgba(120,53,15,.2);
+  color: #fde68a !important;
+}
+
+.admin-state-pill.is-danger {
+  border-color: rgba(248,113,113,.26);
+  background: rgba(127,29,29,.2);
+  color: #fecaca !important;
+}
+
+.admin-report-row {
+  padding: 11px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+
+.admin-report-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+}
+
+.admin-report-head strong {
+  display: block;
+  font-size: 11px;
+}
+
+.admin-report-head span {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 8px;
+}
+
+.admin-report-row p {
+  margin: 9px 0 0;
+  color: #cbd5e1;
+  font-size: 9px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-report-detail {
+  margin-top: 9px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(2,6,23,.42);
+}
+
+.admin-report-detail span {
+  display: block;
+  color: #64748b;
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-report-detail strong {
+  display: block;
+  margin-top: 4px;
+  color: #cbd5e1;
+  font-size: 8px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.admin-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.admin-report-meta span,
+.admin-report-meta a {
+  color: #94a3b8;
+  font-size: 7px;
+  text-decoration: none;
+}
+
+.admin-report-meta a {
+  color: #f9a8d4;
+}
+
+.admin-report-meta .is-error {
+  color: #fecaca;
 }
 
 .admin-health-muted,
 .admin-health-generated {
-  color:#94a3b8;
-  font-size:10px;
+  color: #94a3b8;
+  font-size: 10px;
 }
-.admin-health-error {
-  color:#fecaca;
-  font-size:12px;
+
+.admin-health-error,
+.admin-health-inline-error {
+  color: #fecaca;
+  font-size: 12px;
 }
+
+.admin-health-inline-error {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(127,29,29,.15);
+}
+
 .admin-health-generated {
-  margin-top:14px;
-  text-align:center;
+  margin-top: 14px;
+  text-align: center;
 }
 
 @media (max-width: 420px) {
-  .admin-health-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .admin-health-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
 }
