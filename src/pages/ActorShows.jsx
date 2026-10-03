@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { addShowToUserList } from "../lib/userShows";
 import { supabase } from "../lib/supabase";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "../lib/savedShowLibrary";
 import { formatDate } from "../lib/date";
 import {
   getMappedShowHref,
@@ -52,7 +53,7 @@ export default function ActorPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadSavedShows() {
+    async function loadSavedShows(candidateShows = []) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -62,25 +63,18 @@ export default function ActorPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_shows_new")
-        .select("shows!inner(tvdb_id)")
-        .eq("user_id", user.id);
+      try {
+        const tvdbIds = (candidateShows || [])
+          .map((show) => show?.resolved_tvdb_id || show?.tvdb_id)
+          .filter(Boolean);
+        const rows = await fetchSavedShowRows(user.id, { tvdbIds });
+        const ids = getSavedExternalIdSets(rows).tvdb;
 
-      if (error) {
+        if (!cancelled) {
+          setSavedIds(ids);
+        }
+      } catch (error) {
         console.warn("Failed loading saved ids", error);
-        return;
-      }
-
-      const ids = new Set(
-        (data || [])
-          .map((row) => row?.shows?.tvdb_id)
-          .filter(Boolean)
-          .map(String)
-      );
-
-      if (!cancelled) {
-        setSavedIds(ids);
       }
     }
 
@@ -142,7 +136,7 @@ export default function ActorPage() {
           setCredits(normalizedCredits);
         }
 
-        await loadSavedShows();
+        await loadSavedShows(normalizedCredits);
       } catch (err) {
         if (!cancelled) {
           setError(err?.message || "Failed to load actor shows");
