@@ -17,6 +17,16 @@ function normalizeNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
@@ -76,6 +86,90 @@ function remoteIds(series: any) {
   }
   return result;
 }
+
+function dedupeEpisodeRows(rows: any[]) {
+  const byComposite = new Map<string, any>();
+  const byTvdb = new Map<string, any>();
+
+  for (const row of rows) {
+    const compositeKey = [
+      row.show_id,
+      row.season_type,
+      row.season_number,
+      row.episode_number,
+    ].join(":");
+    const tvdbKey = row.tvdb_id == null ? "" : String(row.tvdb_id);
+
+    if (tvdbKey && byTvdb.has(tvdbKey)) {
+      const existing = byTvdb.get(tvdbKey);
+      for (const [key, value] of Object.entries(row)) {
+        if (existing[key] == null && value != null) existing[key] = value;
+      }
+      continue;
+    }
+
+    if (byComposite.has(compositeKey)) {
+      const existing = byComposite.get(compositeKey);
+      for (const [key, value] of Object.entries(row)) {
+        if (existing[key] == null && value != null) existing[key] = value;
+      }
+      if (existing.tvdb_id != null) {
+        byTvdb.set(String(existing.tvdb_id), existing);
+      }
+      continue;
+    }
+
+    byComposite.set(compositeKey, row);
+    if (tvdbKey) byTvdb.set(tvdbKey, row);
+  }
+
+  return [...byComposite.values()];
+}
+
+function episodeMetadataPatch(row: any) {
+  return {
+    absolute_number: row.absolute_number,
+    name: row.name,
+    overview: row.overview,
+    aired_date: row.aired_date,
+    runtime_minutes: row.runtime_minutes,
+    image_url: row.image_url,
+    is_special: row.is_special,
+    is_premiere: row.is_premiere,
+    is_finale: row.is_finale,
+    last_synced_at: row.last_synced_at,
+    updated_at: row.updated_at,
+    season_id: row.season_id,
+  };
+}
+
+async function upsertEpisodeBatch(batch: any[]) {
+  const { error } = await supabase.from("episodes").upsert(batch, {
+    onConflict: "show_id,season_type,season_number,episode_number",
+  });
+
+  if (!error) return;
+  if (String(error.code || "") !== "23505") throw error;
+
+  for (const row of batch) {
+    const { error: rowError } = await supabase.from("episodes").upsert(row, {
+      onConflict: "show_id,season_type,season_number,episode_number",
+    });
+
+    if (!rowError) continue;
+
+    if (String(rowError.code || "") !== "23505" || row.tvdb_id == null) {
+      throw rowError;
+    }
+
+    const { error: legacyError } = await supabase
+      .from("episodes")
+      .update(episodeMetadataPatch(row))
+      .eq("tvdb_id", row.tvdb_id);
+
+    if (legacyError) throw legacyError;
+  }
+}
 async function syncOne(job: any, token: string) {
   const now = new Date().toISOString();
   const seriesPayload = await tvdbJson(`/series/${job.tvdb_id}/extended`, token);
@@ -132,7 +226,7 @@ async function syncOne(job: any, token: string) {
     });
   }
 
-  const episodeRows = [];
+  const rawEpisodeRows = [];
   for (const ep of episodes) {
     const seasonNumber = Number(ep?.seasonNumber);
     const episodeNumber = Number(ep?.number);
@@ -152,12 +246,9 @@ async function syncOne(job: any, token: string) {
       last_synced_at: now,
       updated_at: now,
     };
-    season.episode_count += 1;
-    if (aired && (!season.aired_from || aired < season.aired_from)) season.aired_from = aired;
-    if (aired && (!season.aired_to || aired > season.aired_to)) season.aired_to = aired;
     seasonByNumber.set(seasonNumber, season);
 
-    episodeRows.push({
+    rawEpisodeRows.push({
       tvdb_id: normalizeNumber(ep?.id),
       show_id: job.show_id,
       season_type: "official",
@@ -175,6 +266,26 @@ async function syncOne(job: any, token: string) {
       last_synced_at: now,
       updated_at: now,
     });
+  }
+
+  const episodeRows = dedupeEpisodeRows(rawEpisodeRows);
+
+  for (const season of seasonByNumber.values()) {
+    season.episode_count = 0;
+    season.aired_from = null;
+    season.aired_to = null;
+  }
+
+  for (const ep of episodeRows) {
+    const season = seasonByNumber.get(Number(ep.season_number));
+    if (!season) continue;
+    season.episode_count += 1;
+    if (ep.aired_date && (!season.aired_from || ep.aired_date < season.aired_from)) {
+      season.aired_from = ep.aired_date;
+    }
+    if (ep.aired_date && (!season.aired_to || ep.aired_date > season.aired_to)) {
+      season.aired_to = ep.aired_date;
+    }
   }
 
   const seasonRows = [...seasonByNumber.values()];
@@ -198,10 +309,7 @@ async function syncOne(job: any, token: string) {
       ...ep,
       season_id: seasonIds.get(Number(ep.season_number)) || null,
     }));
-    const { error } = await supabase.from("episodes").upsert(batch, {
-      onConflict: "show_id,season_type,season_number,episode_number",
-    });
-    if (error) throw error;
+    await upsertEpisodeBatch(batch);
   }
 
   return { episodes: episodeRows.length, seasons: seasonRows.length };
@@ -230,7 +338,7 @@ Deno.serve(async (req) => {
         synced += 1;
         results.push({ show_id: job.show_id, tvdb_id: job.tvdb_id, ok: true, ...stats });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         await supabase.rpc("fail_show_sync", {
           p_show_id: job.show_id,
           p_generation: job.generation,
