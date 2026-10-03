@@ -413,32 +413,19 @@ async function fetchOverallStatsForShows(showIds) {
 
   if (!ids.length) return statsByShow;
 
-  const [asShowA, asShowB] = await Promise.all([
-    supabase
-      .from("rankd_matchups")
-      .select("show_a_id, show_a_wins, times_matched")
-      .in("show_a_id", ids),
-    supabase
-      .from("rankd_matchups")
-      .select("show_b_id, show_b_wins, times_matched")
-      .in("show_b_id", ids),
-  ]);
-
-  if (asShowA.error) throw asShowA.error;
-  if (asShowB.error) throw asShowB.error;
-
-  (asShowA.data || []).forEach((row) => {
-    const showId = String(row.show_a_id);
-    if (!statsByShow[showId]) return;
-    statsByShow[showId].wins += Number(row.show_a_wins || 0);
-    statsByShow[showId].total += Number(row.times_matched || 0);
+  const { data, error } = await supabase.rpc("get_rankd_overall_stats", {
+    p_show_ids: ids,
   });
 
-  (asShowB.data || []).forEach((row) => {
-    const showId = String(row.show_b_id);
+  if (error) throw error;
+
+  (data || []).forEach((row) => {
+    const showId = String(row.show_id || "");
     if (!statsByShow[showId]) return;
-    statsByShow[showId].wins += Number(row.show_b_wins || 0);
-    statsByShow[showId].total += Number(row.times_matched || 0);
+    statsByShow[showId] = {
+      wins: Number(row.wins || 0),
+      total: Number(row.total || 0),
+    };
   });
 
   return statsByShow;
