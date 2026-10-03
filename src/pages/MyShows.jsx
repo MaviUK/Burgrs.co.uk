@@ -190,19 +190,19 @@ async function fetchWatchProgress(userId) {
   return allRows;
 }
 
-async function fetchSeasonTotals(showIds) {
+async function fetchShowEpisodeCounts(showIds) {
   if (!showIds.length) return {};
 
-  const totals = {};
-  const batches = chunkArray(showIds, 100);
+  const counts = {};
+  const batches = chunkArray(showIds, 200);
 
   for (let index = 0; index < batches.length; index += EPISODE_FETCH_CONCURRENCY) {
     const group = batches.slice(index, index + EPISODE_FETCH_CONCURRENCY);
     const results = await Promise.all(
       group.map((batch) =>
         supabase
-          .from("seasons")
-          .select("show_id, season_number, episode_count")
+          .from("show_episode_counts")
+          .select("show_id, main_episode_count")
           .in("show_id", batch)
       )
     );
@@ -211,14 +211,12 @@ async function fetchSeasonTotals(showIds) {
       if (result.error) throw result.error;
 
       for (const row of result.data || []) {
-        if (Number(row.season_number ?? 0) === 0) continue;
-        const key = String(row.show_id);
-        totals[key] = Number(totals[key] || 0) + Number(row.episode_count || 0);
+        counts[String(row.show_id)] = Number(row.main_episode_count || 0);
       }
     }
   }
 
-  return totals;
+  return counts;
 }
 
 function MyShowsLoading({ isMobile }) {
@@ -499,9 +497,9 @@ export default function MyShows() {
         return;
       }
 
-      const [progressRows, seasonTotals] = await Promise.all([
+      const [progressRows, episodeCounts] = await Promise.all([
         fetchWatchProgress(user.id),
-        fetchSeasonTotals(showIds),
+        fetchShowEpisodeCounts(showIds),
       ]);
 
       const watchedByShow = new Map(
@@ -514,7 +512,7 @@ export default function MyShows() {
       const updatedShows = normalizedUserShows.map((userShow) => {
         const showKey = String(userShow.show_id);
         const watchedMainCount = Number(watchedByShow.get(showKey) || 0);
-        const totalMainEpisodes = Number(seasonTotals[showKey] || 0);
+        const totalMainEpisodes = Number(episodeCounts[showKey] || 0);
         const nextEpisodeDate = userShow.next_aired || null;
         const daysToNextEpisode = daysUntil(nextEpisodeDate);
 
