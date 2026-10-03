@@ -6,6 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "../lib/savedShowLibrary";
 import { fetchShowExtrasCached } from "../lib/showExtrasCache";
 import {
   fetchSeasonEpisodeDetailsCached,
@@ -761,24 +762,16 @@ const burgrTouchRef = useRef({
           let savedRecommendationTvdbIds = new Set();
 
           if (candidateTvdbIds.length) {
-            const { data: savedRecommendationRows, error: savedRecommendationError } =
-              await supabase
-                .from("user_shows_new")
-                .select("shows!inner(tvdb_id)")
-                .eq("user_id", user.id)
-                .in("shows.tvdb_id", candidateTvdbIds);
-
-            if (savedRecommendationError) {
+            try {
+              const savedRecommendationRows = await fetchSavedShowRows(user.id, {
+                tvdbIds: candidateTvdbIds,
+              });
+              savedRecommendationTvdbIds =
+                getSavedExternalIdSets(savedRecommendationRows).tvdb;
+            } catch (savedRecommendationError) {
               console.warn(
                 "Failed checking saved recommendations:",
                 savedRecommendationError
-              );
-            } else {
-              savedRecommendationTvdbIds = new Set(
-                (savedRecommendationRows || [])
-                  .map((row) => row?.shows?.tvdb_id)
-                  .filter(Boolean)
-                  .map(String)
               );
             }
           }
