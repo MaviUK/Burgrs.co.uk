@@ -455,6 +455,69 @@ function normalizeCombinedResult(item, context, genreMap) {
   };
 }
 
+function uniqueNames(items, key = "name", limit = 3) {
+  const seen = new Set();
+  const names = [];
+
+  for (const item of items || []) {
+    const name = String(item?.[key] || "").trim();
+    const normalized = name.toLowerCase();
+    if (!name || seen.has(normalized)) continue;
+    seen.add(normalized);
+    names.push(name);
+    if (names.length >= limit) break;
+  }
+
+  return names;
+}
+
+function getStreamingProviders(regionData) {
+  return uniqueNames(
+    [
+      ...(regionData?.flatrate || []),
+      ...(regionData?.free || []),
+      ...(regionData?.ads || []),
+    ],
+    "provider_name",
+    3
+  );
+}
+
+async function enrichSearchResults(results, region) {
+  return Promise.all(
+    (results || []).map(async (result) => {
+      if (!result?.tmdb_id) return result;
+
+      try {
+        const detail = await tmdbFetch(`/tv/${result.tmdb_id}`, {
+          append_to_response: "watch/providers",
+        });
+
+        const studios = uniqueNames(detail?.production_companies, "name", 2);
+        const regionData = detail?.["watch/providers"]?.results?.[region] || {};
+        const providers = getStreamingProviders(regionData);
+
+        return {
+          ...result,
+          studio: studios[0] || result.studio || null,
+          studios: studios.length ? studios : result.studios || [],
+          platform: providers.length
+            ? providers.join(", ")
+            : result.platform || null,
+          network: providers[0] || result.network || null,
+          total_seasons:
+            Number(detail?.number_of_seasons || 0) || result.total_seasons || null,
+          total_episodes:
+            Number(detail?.number_of_episodes || 0) || result.total_episodes || null,
+        };
+      } catch (detailError) {
+        console.warn("Search result enrichment failed", result?.tmdb_id, detailError);
+        return result;
+      }
+    })
+  );
+}
+
 export async function handler(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
@@ -657,9 +720,10 @@ export async function handler(event) {
           startIndex,
           startIndex + PAGE_SIZE
         );
-        const results = pagedRawResults
+        let results = pagedRawResults
           .map((item) => normalizeCombinedResult(item, context, genreMap))
           .filter((item) => item.tmdb_id);
+        results = await enrichSearchResults(results, region);
 
         return response(200, {
           mode: "combined",
@@ -677,9 +741,10 @@ export async function handler(event) {
       }
 
       const totalPages = rawTotalPages;
-      const results = rawResults
+      let results = rawResults
         .map((item) => normalizeCombinedResult(item, context, genreMap))
         .filter((item) => item.tmdb_id);
+      results = await enrichSearchResults(results, region);
 
       return response(200, {
         mode: "combined",
@@ -726,9 +791,10 @@ export async function handler(event) {
     const discovered = await tmdbFetch("/discover/tv", discoverParams);
     const rawTotalPages = Number(discovered?.total_pages || 1);
     const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
-    const results = (Array.isArray(discovered?.results) ? discovered.results : [])
+    let results = (Array.isArray(discovered?.results) ? discovered.results : [])
       .map((item) => normalizeCombinedResult(item, context, genreMap))
       .filter((item) => item.tmdb_id);
+    results = await enrichSearchResults(results, region);
 
     return response(200, {
       mode: "combined",
