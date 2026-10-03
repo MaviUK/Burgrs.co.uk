@@ -358,114 +358,261 @@ function parseYearQuery(query) {
   return null;
 }
 
+async function resolveCompany(query) {
+  const data = await tmdbFetch("/search/company", {
+    query,
+    page: "1",
+  });
+  const companies = Array.isArray(data?.results) ? data.results : [];
+  const match = bestMatch(companies, query);
+  return match?.score > 0 ? match.item : null;
+}
+
+function readFilter(params, key) {
+  return String(params?.[key] || "").trim();
+}
+
+function getProviderItems(regionData) {
+  return [
+    ...(regionData?.flatrate || []),
+    ...(regionData?.free || []),
+    ...(regionData?.ads || []),
+    ...(regionData?.rent || []),
+    ...(regionData?.buy || []),
+  ];
+}
+
+function isWithinYearRange(firstAirDate, yearRange) {
+  if (!yearRange) return true;
+  const year = Number(String(firstAirDate || "").slice(0, 4));
+  return Number.isFinite(year) && year >= yearRange.startYear && year <= yearRange.endYear;
+}
+
+function normalizeCombinedResult(item, context, genreMap) {
+  const result = normalizeTmdbResult(item, context, genreMap);
+  return {
+    ...result,
+    studio: context.studioName || null,
+    studios: context.studioName ? [context.studioName] : [],
+  };
+}
+
 export async function handler(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
   }
 
   try {
-    const mode = String(event.queryStringParameters?.mode || "")
-      .trim()
-      .toLowerCase();
-    const query = String(event.queryStringParameters?.q || "").trim();
-    const region = String(event.queryStringParameters?.region || DEFAULT_REGION)
-      .trim()
-      .toUpperCase();
-    const requestedPage = Number(event.queryStringParameters?.page || 1);
+    const params = event.queryStringParameters || {};
+    const mode = String(params.mode || "").trim().toLowerCase();
+    const query = String(params.q || "").trim();
+    const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
+    const requestedPage = Number(params.page || 1);
     const page = Math.max(
       1,
       Number.isFinite(requestedPage) ? Math.floor(requestedPage) : 1
     );
 
-    if (!query || !["genre", "year", "platform", "studio"].includes(mode)) {
-      return response(400, {
-        message: "Choose Genre, Year, Platform or Studio and enter a search term.",
-      });
+    const filters = {
+      title: readFilter(params, "title"),
+      genre: readFilter(params, "genre"),
+      year: readFilter(params, "year"),
+      platform: readFilter(params, "platform"),
+      studio: readFilter(params, "studio"),
+    };
+
+    if (
+      !Object.values(filters).some(Boolean) &&
+      query &&
+      ["title", "genre", "year", "platform", "studio"].includes(mode)
+    ) {
+      filters[mode] = query;
     }
 
-    if (mode === "studio") {
-      const studioSearch = await searchTvdbCompany(query, page);
-
-      if (!studioSearch.results.length && page === 1) {
-        return response(404, {
-          message: `No studio, network or production company matched “${query}”.`,
-        });
-      }
-
-      return response(200, {
-        mode,
-        query,
-        matched: query,
-        page,
-        totalPages: studioSearch.totalPages,
-        totalResults: studioSearch.totalResults,
-        hasMore: studioSearch.hasMore,
-        results: studioSearch.results,
-        matchType: "tvdb-company",
+    if (!Object.values(filters).some(Boolean)) {
+      return response(400, {
+        message: "Add at least one Title, Genre, Year, Platform or Studio filter.",
       });
     }
 
     const genres = await getGenres();
     const genreMap = new Map(genres.map((genre) => [Number(genre.id), genre.name]));
+    const context = {};
+
+    let genre = null;
+    if (filters.genre) {
+      genre = await resolveGenre(filters.genre);
+      if (!genre) {
+        return response(404, { message: `No TV genre matched “${filters.genre}”.` });
+      }
+      context.genreName = genre.name;
+    }
+
+    let provider = null;
+    if (filters.platform) {
+      provider = await resolveProvider(filters.platform, region);
+      if (!provider) {
+        return response(404, {
+          message: `No streaming platform matched “${filters.platform}” in ${regionLabel(region)}.`,
+        });
+      }
+      context.platformName = provider.provider_name;
+    }
+
+    let yearRange = null;
+    if (filters.year) {
+      yearRange = parseYearQuery(filters.year);
+      if (!yearRange) {
+        return response(400, {
+          message: "Enter a four-digit year such as 1973, or a decade such as 1990s.",
+        });
+      }
+      context.yearLabel = yearRange.label;
+    }
+
+    let company = null;
+    if (filters.studio) {
+      company = await resolveCompany(filters.studio);
+      if (!company) {
+        return response(404, {
+          message: `No studio or production company matched “${filters.studio}”.`,
+        });
+      }
+      context.studioName = company.name;
+    }
+
+    const appliedFilters = {
+      ...(filters.title ? { title: filters.title } : {}),
+      ...(genre ? { genre: genre.name } : {}),
+      ...(yearRange ? { year: yearRange.label } : {}),
+      ...(provider ? { platform: provider.provider_name } : {}),
+      ...(company ? { studio: company.name } : {}),
+    };
+
+    if (filters.title) {
+      const searched = await tmdbFetch("/search/tv", {
+        query: filters.title,
+        page: String(Math.min(MAX_TMDB_PAGE, page)),
+        include_adult: "false",
+      });
+
+      let rawResults = Array.isArray(searched?.results) ? searched.results : [];
+
+      if (genre) {
+        rawResults = rawResults.filter((item) =>
+          (item?.genre_ids || []).map(Number).includes(Number(genre.id))
+        );
+      }
+
+      if (yearRange) {
+        rawResults = rawResults.filter((item) =>
+          isWithinYearRange(item?.first_air_date, yearRange)
+        );
+      }
+
+      if (provider || company) {
+        const checked = await Promise.all(
+          rawResults.map(async (item) => {
+            try {
+              const detail = await tmdbFetch(`/tv/${item.id}`, {
+                append_to_response: "watch/providers",
+              });
+
+              if (
+                company &&
+                !(detail?.production_companies || []).some(
+                  (entry) => Number(entry?.id) === Number(company.id)
+                )
+              ) {
+                return null;
+              }
+
+              if (provider) {
+                const regionData = detail?.["watch/providers"]?.results?.[region] || {};
+                const available = getProviderItems(regionData).some(
+                  (entry) => Number(entry?.provider_id) === Number(provider.provider_id)
+                );
+                if (!available) return null;
+              }
+
+              return item;
+            } catch (detailError) {
+              console.warn("Combined title filter detail lookup failed", item?.id, detailError);
+              return null;
+            }
+          })
+        );
+        rawResults = checked.filter(Boolean);
+      }
+
+      const rawTotalPages = Number(searched?.total_pages || 1);
+      const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
+      const hasRefinements = Boolean(
+        filters.genre || filters.year || filters.platform || filters.studio
+      );
+      const results = rawResults
+        .map((item) => normalizeCombinedResult(item, context, genreMap))
+        .filter((item) => item.tmdb_id);
+
+      return response(200, {
+        mode: "combined",
+        query: filters.title,
+        matched: Object.values(appliedFilters).join(" + "),
+        appliedFilters,
+        page,
+        totalPages,
+        totalResults: hasRefinements
+          ? null
+          : Number(searched?.total_results || results.length),
+        hasMore: page < totalPages,
+        results,
+        matchType: "combined-title",
+      });
+    }
+
     const discoverParams = {
       page: String(Math.min(MAX_TMDB_PAGE, page)),
       sort_by: "popularity.desc",
       include_adult: "false",
       include_null_first_air_dates: "false",
     };
-    const context = {};
 
-    if (mode === "genre") {
-      const genre = await resolveGenre(query);
-      if (!genre) {
-        return response(404, { message: `No TV genre matched “${query}”.` });
-      }
+    if (genre) {
       discoverParams.with_genres = String(genre.id);
-      context.genreName = genre.name;
     }
 
-    if (mode === "platform") {
-      const provider = await resolveProvider(query, region);
-      if (!provider) {
-        return response(404, {
-          message: `No streaming platform matched “${query}” in ${regionLabel(region)}.`,
-        });
-      }
+    if (provider) {
       discoverParams.with_watch_providers = String(provider.provider_id);
       discoverParams.watch_region = region;
-      context.platformName = provider.provider_name;
     }
 
-    if (mode === "year") {
-      const yearRange = parseYearQuery(query);
-      if (!yearRange) {
-        return response(400, {
-          message: "Enter a four-digit year such as 1973, or a decade such as 1990s.",
-        });
-      }
-
+    if (yearRange) {
       discoverParams["first_air_date.gte"] = `${yearRange.startYear}-01-01`;
       discoverParams["first_air_date.lte"] = `${yearRange.endYear}-12-31`;
-      context.yearLabel = yearRange.label;
+    }
+
+    if (company) {
+      discoverParams.with_companies = String(company.id);
     }
 
     const discovered = await tmdbFetch("/discover/tv", discoverParams);
     const rawTotalPages = Number(discovered?.total_pages || 1);
     const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
     const results = (Array.isArray(discovered?.results) ? discovered.results : [])
-      .map((item) => normalizeTmdbResult(item, context, genreMap))
+      .map((item) => normalizeCombinedResult(item, context, genreMap))
       .filter((item) => item.tmdb_id);
 
     return response(200, {
-      mode,
-      query,
-      matched: context.genreName || context.platformName || context.yearLabel || query,
+      mode: "combined",
+      query: Object.values(filters).filter(Boolean).join(" + "),
+      matched: Object.values(appliedFilters).join(" + "),
+      appliedFilters,
       page,
       totalPages,
       totalResults: Number(discovered?.total_results || results.length),
       hasMore: page < totalPages,
       results,
-      matchType: mode,
+      matchType: "combined-discover",
     });
   } catch (error) {
     console.error("advancedSearchShows error", error);
