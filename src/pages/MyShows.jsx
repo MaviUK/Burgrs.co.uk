@@ -148,7 +148,8 @@ async function fetchSavedShowLibrary(userId) {
         status,
         poster_url,
         backdrop_url,
-        first_aired
+        first_aired,
+        next_aired
       `)
       .eq("user_id", userId)
       .range(from, from + pageSize - 1);
@@ -165,90 +166,59 @@ async function fetchSavedShowLibrary(userId) {
   return allRows;
 }
 
-async function fetchEpisodeBatch(showIds) {
-  const allEpisodes = [];
+async function fetchWatchProgress(userId) {
+  const allRows = [];
   const pageSize = 1000;
   let from = 0;
 
   while (true) {
-    const to = from + pageSize - 1;
-
     const { data, error } = await supabase
-      .from("episodes")
-      .select(`
-        id,
-        show_id,
-        season_number,
-        episode_number,
-        name,
-        aired_date
-      `)
-      .in("show_id", showIds)
-      .order("show_id", { ascending: true })
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true })
-      .range(from, to);
-
-    if (error) throw error;
-
-    const rows = data || [];
-    allEpisodes.push(...rows);
-
-    if (rows.length < pageSize) break;
-    from += pageSize;
-  }
-
-  return allEpisodes;
-}
-
-async function fetchEpisodesForShowIds(showIds) {
-  if (!showIds.length) return [];
-
-  const batches = chunkArray(showIds, EPISODE_SHOW_BATCH_SIZE);
-  const allEpisodes = [];
-
-  for (let i = 0; i < batches.length; i += EPISODE_FETCH_CONCURRENCY) {
-    const batchGroup = batches.slice(i, i + EPISODE_FETCH_CONCURRENCY);
-    const groupResults = await Promise.all(
-      batchGroup.map((batch) => fetchEpisodeBatch(batch))
-    );
-
-    for (const rows of groupResults) {
-      allEpisodes.push(...rows);
-    }
-  }
-
-  return allEpisodes;
-}
-
-async function fetchAllWatchedEpisodeRows(userId) {
-  const pageSize = 1000;
-  let from = 0;
-  let done = false;
-  const allRows = [];
-
-  while (!done) {
-    const to = from + pageSize - 1;
-
-    const { data, error } = await supabase
-      .from("watched_episodes")
-      .select("episode_id")
+      .from("user_show_watch_progress")
+      .select("show_id, watched_main_count")
       .eq("user_id", userId)
-      .range(from, to);
+      .range(from, from + pageSize - 1);
 
     if (error) throw error;
 
     const rows = data || [];
     allRows.push(...rows);
 
-    if (rows.length < pageSize) {
-      done = true;
-    } else {
-      from += pageSize;
-    }
+    if (rows.length < pageSize) break;
+    from += pageSize;
   }
 
   return allRows;
+}
+
+async function fetchSeasonTotals(showIds) {
+  if (!showIds.length) return {};
+
+  const totals = {};
+  const batches = chunkArray(showIds, 100);
+
+  for (let index = 0; index < batches.length; index += EPISODE_FETCH_CONCURRENCY) {
+    const group = batches.slice(index, index + EPISODE_FETCH_CONCURRENCY);
+    const results = await Promise.all(
+      group.map((batch) =>
+        supabase
+          .from("seasons")
+          .select("show_id, season_number, episode_count")
+          .in("show_id", batch)
+      )
+    );
+
+    for (const result of results) {
+      if (result.error) throw result.error;
+
+      for (const row of result.data || []) {
+        if (Number(row.season_number ?? 0) === 0) continue;
+        const key = String(row.show_id);
+        totals[key] = Number(totals[key] || 0) + Number(row.episode_count || 0);
+      }
+    }
+  }
+
+  return totals;
 }
 
 function MyShowsLoading({ isMobile }) {
@@ -471,6 +441,7 @@ export default function MyShows() {
         status: row.status || null,
         poster_url: row.poster_url || null,
         first_aired: row.first_aired || null,
+        next_aired: row.next_aired || null,
       }));
 
       const immediateShows = normalizedUserShows.map((show) => {
@@ -528,67 +499,31 @@ export default function MyShows() {
         return;
       }
 
-      const [watchedRows, allEpisodes] = await Promise.all([
-        fetchAllWatchedEpisodeRows(user.id),
-        fetchEpisodesForShowIds(showIds),
+      const [progressRows, seasonTotals] = await Promise.all([
+        fetchWatchProgress(user.id),
+        fetchSeasonTotals(showIds),
       ]);
 
-      const watchedEpisodeIds = new Set(
-        (watchedRows || [])
-          .map((row) => row.episode_id)
-          .filter(Boolean)
-          .map(String)
+      const watchedByShow = new Map(
+        (progressRows || []).map((row) => [
+          String(row.show_id),
+          Number(row.watched_main_count || 0),
+        ])
       );
 
-      const episodesByShowId = {};
-      for (const ep of allEpisodes || []) {
-        const key = ep.show_id;
-        if (!episodesByShowId[key]) episodesByShowId[key] = [];
-        episodesByShowId[key].push(ep);
-      }
-
       const updatedShows = normalizedUserShows.map((userShow) => {
-        const showEpisodes = episodesByShowId[userShow.show_id] || [];
-
-        const mainEpisodes = showEpisodes.filter(
-          (ep) => Number(ep.season_number ?? 0) !== 0
-        );
-
-        const futureMainEpisodes = mainEpisodes.filter(
-          (ep) => ep.aired_date && !isAired(ep.aired_date)
-        );
-
-        const watchedMainCount = mainEpisodes.filter((ep) =>
-          watchedEpisodeIds.has(String(ep.id))
-        ).length;
-
-        const totalMainEpisodes = mainEpisodes.length;
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const upcomingEpisodes = futureMainEpisodes
-          .filter((ep) => ep.aired_date)
-          .filter((ep) => {
-            const airDate = new Date(ep.aired_date);
-            airDate.setHours(0, 0, 0, 0);
-            return airDate >= today;
-          })
-          .sort((a, b) => new Date(a.aired_date) - new Date(b.aired_date));
-
-        const nextEpisodeDate =
-          upcomingEpisodes.length > 0 ? upcomingEpisodes[0].aired_date : null;
-
+        const showKey = String(userShow.show_id);
+        const watchedMainCount = Number(watchedByShow.get(showKey) || 0);
+        const totalMainEpisodes = Number(seasonTotals[showKey] || 0);
+        const nextEpisodeDate = userShow.next_aired || null;
         const daysToNextEpisode = daysUntil(nextEpisodeDate);
-
-        const statusEpisodes = mainEpisodes.map(toStatusEpisodeShape);
 
         const status = getShowStatus(
           {
             ...userShow,
             first_aired: userShow.first_aired,
           },
-          statusEpisodes
+          nextEpisodeDate ? [{ aired: nextEpisodeDate }] : []
         );
 
         const statusValue = String(userShow.watch_status || "").toLowerCase();
