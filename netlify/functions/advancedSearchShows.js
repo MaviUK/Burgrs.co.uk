@@ -372,6 +372,64 @@ function readFilter(params, key) {
   return String(params?.[key] || "").trim();
 }
 
+function normalizeSort(value) {
+  const sort = String(value || "default").trim().toLowerCase();
+  return ["default", "highest-rated", "most-popular", "newest", "oldest", "a-z"].includes(sort)
+    ? sort
+    : "default";
+}
+
+function tmdbDiscoverSort(sort) {
+  const map = {
+    "highest-rated": "vote_average.desc",
+    "most-popular": "popularity.desc",
+    newest: "first_air_date.desc",
+    oldest: "first_air_date.asc",
+    "a-z": "name.asc",
+  };
+  return map[sort] || "popularity.desc";
+}
+
+function sortTitleResults(items, sort) {
+  const results = [...(items || [])];
+
+  if (sort === "highest-rated") {
+    return results.sort((a, b) => {
+      const ratingDiff = Number(b?.vote_average || 0) - Number(a?.vote_average || 0);
+      if (ratingDiff) return ratingDiff;
+      return Number(b?.vote_count || 0) - Number(a?.vote_count || 0);
+    });
+  }
+
+  if (sort === "most-popular") {
+    return results.sort((a, b) => Number(b?.popularity || 0) - Number(a?.popularity || 0));
+  }
+
+  if (sort === "newest" || sort === "oldest") {
+    const direction = sort === "newest" ? -1 : 1;
+    return results.sort((a, b) => {
+      const aDate = String(a?.first_air_date || "");
+      const bDate = String(b?.first_air_date || "");
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return aDate.localeCompare(bDate) * direction;
+    });
+  }
+
+  if (sort === "a-z") {
+    return results.sort((a, b) =>
+      String(a?.name || a?.original_name || "").localeCompare(
+        String(b?.name || b?.original_name || ""),
+        "en",
+        { sensitivity: "base" }
+      )
+    );
+  }
+
+  return results;
+}
+
 function getProviderItems(regionData) {
   return [
     ...(regionData?.flatrate || []),
@@ -408,6 +466,7 @@ export async function handler(event) {
     const query = String(params.q || "").trim();
     const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
     const requestedPage = Number(params.page || 1);
+    const sort = normalizeSort(params.sort);
     const page = Math.max(
       1,
       Number.isFinite(requestedPage) ? Math.floor(requestedPage) : 1
@@ -545,6 +604,8 @@ export async function handler(event) {
         rawResults = checked.filter(Boolean);
       }
 
+      rawResults = sortTitleResults(rawResults, sort);
+
       const rawTotalPages = Number(searched?.total_pages || 1);
       const totalPages = Math.min(MAX_TMDB_PAGE, Math.max(1, rawTotalPages));
       const hasRefinements = Boolean(
@@ -567,12 +628,13 @@ export async function handler(event) {
         hasMore: page < totalPages,
         results,
         matchType: "combined-title",
+        sort,
       });
     }
 
     const discoverParams = {
       page: String(Math.min(MAX_TMDB_PAGE, page)),
-      sort_by: "popularity.desc",
+      sort_by: tmdbDiscoverSort(sort),
       include_adult: "false",
       include_null_first_air_dates: "false",
     };
@@ -613,6 +675,7 @@ export async function handler(event) {
       hasMore: page < totalPages,
       results,
       matchType: "combined-discover",
+      sort,
     });
   } catch (error) {
     console.error("advancedSearchShows error", error);
