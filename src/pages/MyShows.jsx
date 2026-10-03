@@ -122,13 +122,47 @@ function chunkArray(items, size) {
 }
 
 function getPreferredShowName(showRow) {
-  return (
-    showRow?.english_name ||
-    showRow?.name_eng ||
-    showRow?.english_title ||
-    showRow?.name ||
-    "Unknown title"
-  );
+  return showRow?.name || "Unknown title";
+}
+
+async function fetchSavedShowLibrary(userId) {
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("my_show_library_flat")
+      .select(`
+        id,
+        user_id,
+        show_id,
+        watch_status,
+        archived_at,
+        added_at,
+        created_at,
+        tvdb_id,
+        tmdb_id,
+        name,
+        overview,
+        status,
+        poster_url,
+        backdrop_url,
+        first_aired
+      `)
+      .eq("user_id", userId)
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allRows;
 }
 
 async function fetchEpisodeBatch(showIds) {
@@ -420,21 +454,7 @@ export default function MyShows() {
         return;
       }
 
-      const { data: userShows, error: userShowsError } = await supabase
-        .from("user_shows_new")
-        .select(`
-          id,
-          user_id,
-          show_id,
-          watch_status,
-          archived_at,
-          added_at,
-          created_at,
-          shows!inner(*)
-        `)
-        .eq("user_id", user.id);
-
-      if (userShowsError) throw userShowsError;
+      const userShows = await fetchSavedShowLibrary(user.id);
 
       const normalizedUserShows = (userShows || []).map((row) => ({
         id: row.id,
@@ -444,13 +464,13 @@ export default function MyShows() {
         archived_at: row.archived_at || null,
         added_at: row.added_at,
         created_at: row.created_at,
-        tvdb_id: row.shows.tvdb_id,
-        tmdb_id: row.shows.tmdb_id,
-        show_name: getPreferredShowName(row.shows),
-        overview: row.shows.overview || "",
-        status: row.shows.status || null,
-        poster_url: row.shows.poster_url || null,
-        first_aired: row.shows.first_aired || null,
+        tvdb_id: row.tvdb_id,
+        tmdb_id: row.tmdb_id,
+        show_name: getPreferredShowName(row),
+        overview: row.overview || "",
+        status: row.status || null,
+        poster_url: row.poster_url || null,
+        first_aired: row.first_aired || null,
       }));
 
       const immediateShows = normalizedUserShows.map((show) => {
