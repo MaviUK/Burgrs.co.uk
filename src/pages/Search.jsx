@@ -244,6 +244,13 @@ export default function Search() {
     [searchMode]
   );
 
+  const visualOrderMap = useMemo(() => {
+    const ordered = sortLoadedShows(shows, sortOrder);
+    return new Map(
+      ordered.map((show, index) => [getResultKey(show), index])
+    );
+  }, [shows, sortOrder]);
+
   const isPureNetworkBrowse =
     Boolean(networkFilter) &&
     !genreFilter &&
@@ -861,13 +868,14 @@ export default function Search() {
               <div
                 key={resultKey}
                 className="search-result-banner-card"
-                style={
-                  backdrop
+                style={{
+                  order: visualOrderMap.get(resultKey) ?? 0,
+                  ...(backdrop
                     ? {
                         backgroundImage: `linear-gradient(90deg, rgba(9,14,26,0.96) 0%, rgba(9,14,26,0.84) 42%, rgba(9,14,26,0.92) 100%), url(${backdrop})`,
                       }
-                    : undefined
-                }
+                    : {}),
+                }}
               >
                 <div className="search-result-banner-inner">
                   <Link to={detailHref} className="search-result-poster-link">
