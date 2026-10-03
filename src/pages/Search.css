@@ -127,6 +127,42 @@
   color: #ede9fe;
 }
 
+.search-sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: -2px 0 14px;
+}
+
+.search-sort-row label {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.search-sort-select {
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1px solid rgba(151, 7, 71, 0.35);
+  border-radius: 12px;
+  background: #121a2b;
+  color: #f8fafc;
+  font-size: 0.84rem;
+  font-weight: 750;
+  outline: none;
+}
+
+.search-sort-select:focus,
+.search-sort-select:focus-visible {
+  border-color: #970747;
+  box-shadow: 0 0 0 3px rgba(151, 7, 71, 0.18);
+}
+
+.search-sort-select:disabled {
+  opacity: 0.6;
+}
+
 .search-refine-wrap {
   margin: 0 0 14px;
   padding: 11px 12px;
@@ -398,5 +434,13 @@
 
   .search-bar-wrap {
     margin-top: 0;
+  }
+
+  .search-sort-row {
+    justify-content: space-between;
+  }
+
+  .search-sort-select {
+    max-width: 180px;
   }
 }
