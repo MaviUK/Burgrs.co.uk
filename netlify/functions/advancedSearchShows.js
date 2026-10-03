@@ -374,7 +374,7 @@ function readFilter(params, key) {
 
 function normalizeSort(value) {
   const sort = String(value || "default").trim().toLowerCase();
-  return ["default", "highest-rated", "most-popular", "newest", "oldest", "a-z"].includes(sort)
+  return ["default", "highest-rated", "lowest-rated", "most-popular", "newest", "oldest", "a-z"].includes(sort)
     ? sort
     : "default";
 }
@@ -382,6 +382,7 @@ function normalizeSort(value) {
 function tmdbDiscoverSort(sort) {
   const map = {
     "highest-rated": "vote_average.desc",
+    "lowest-rated": "vote_average.asc",
     "most-popular": "popularity.desc",
     newest: "first_air_date.desc",
     oldest: "first_air_date.asc",
@@ -396,6 +397,21 @@ function sortTitleResults(items, sort) {
   if (sort === "highest-rated") {
     return results.sort((a, b) => {
       const ratingDiff = Number(b?.vote_average || 0) - Number(a?.vote_average || 0);
+      if (ratingDiff) return ratingDiff;
+      return Number(b?.vote_count || 0) - Number(a?.vote_count || 0);
+    });
+  }
+
+  if (sort === "lowest-rated") {
+    return results.sort((a, b) => {
+      const aRating = Number(a?.vote_average || 0);
+      const bRating = Number(b?.vote_average || 0);
+
+      if (aRating <= 0 && bRating <= 0) return 0;
+      if (aRating <= 0) return 1;
+      if (bRating <= 0) return -1;
+
+      const ratingDiff = aRating - bRating;
       if (ratingDiff) return ratingDiff;
       return Number(b?.vote_count || 0) - Number(a?.vote_count || 0);
     });
@@ -769,6 +785,10 @@ export async function handler(event) {
       include_adult: "false",
       include_null_first_air_dates: "false",
     };
+
+    if (sort === "lowest-rated") {
+      discoverParams["vote_count.gte"] = "1";
+    }
 
     if (genre) {
       discoverParams.with_genres = String(genre.id);
