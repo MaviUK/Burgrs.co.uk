@@ -493,6 +493,11 @@ export default function Notifications() {
       <header className="notifications-header">
         <div>
           <h1>Notifications</h1>
+          <p className="notifications-count">
+            {unreadCount > 0
+              ? `${unreadCount} unread`
+              : "All caught up"}
+          </p>
         </div>
 
         <div className="notifications-header-actions">
