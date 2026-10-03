@@ -13,6 +13,18 @@ const SEARCH_MODES = [
   { id: "studio", label: "Studio", placeholder: "e.g. HBO, A24, Warner Bros" },
 ];
 
+const EMPTY_FILTERS = {
+  title: "",
+  genre: "",
+  year: "",
+  platform: "",
+  studio: "",
+};
+
+function hasActiveFilters(filters) {
+  return Object.values(filters || {}).some((value) => String(value || "").trim());
+}
+
 function withTimeout(promise, ms, message) {
   let timerId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -136,8 +148,8 @@ export default function Search() {
   const [advancedPage, setAdvancedPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
-  const [activeAdvancedQuery, setActiveAdvancedQuery] = useState("");
-  const [activeAdvancedMode, setActiveAdvancedMode] = useState("");
+  const [activeFilters, setActiveFilters] = useState(() => ({ ...EMPTY_FILTERS }));
+  const [appliedFilters, setAppliedFilters] = useState(() => ({ ...EMPTY_FILTERS }));
 
   const titleQuery = searchParams.get("q") || "";
   const genreFilter = searchParams.get("genre") || "";
@@ -189,20 +201,33 @@ export default function Search() {
 
   useEffect(() => {
     if (titleQuery) {
+      const next = { ...EMPTY_FILTERS, title: titleQuery };
       setSearchMode("title");
       setQuery(titleQuery);
+      setActiveFilters(next);
+      setAppliedFilters(next);
     } else if (genreFilter) {
+      const next = { ...EMPTY_FILTERS, genre: genreFilter };
       setSearchMode("genre");
       setQuery(genreFilter);
+      setActiveFilters(next);
+      setAppliedFilters(next);
     } else if (networkFilter) {
+      const next = { ...EMPTY_FILTERS, platform: networkFilter };
       setSearchMode("platform");
       setQuery(networkFilter);
+      setActiveFilters(next);
+      setAppliedFilters(next);
     } else if (relationshipTypeFilter) {
       setSearchMode("title");
       setQuery(relationshipTypeFilter);
+      setActiveFilters({ ...EMPTY_FILTERS });
+      setAppliedFilters({ ...EMPTY_FILTERS });
     } else if (settingFilter) {
       setSearchMode("title");
       setQuery(settingFilter);
+      setActiveFilters({ ...EMPTY_FILTERS });
+      setAppliedFilters({ ...EMPTY_FILTERS });
     }
   }, [titleQuery, genreFilter, networkFilter, relationshipTypeFilter, settingFilter]);
 
@@ -261,8 +286,6 @@ export default function Search() {
     setAdvancedPage(1);
     setHasMore(false);
     setTotalResults(0);
-    setActiveAdvancedQuery("");
-    setActiveAdvancedMode("");
   }
 
   async function fetchLegacySearch(paramsObject) {
@@ -300,7 +323,7 @@ export default function Search() {
     }
   }
 
-  async function fetchAdvancedSearch(mode, searchQuery, page = 1, append = false) {
+  async function fetchCombinedSearch(filters, page = 1, append = false) {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
@@ -312,31 +335,48 @@ export default function Search() {
       setCurrentUserId(activeUserId);
 
       const params = new URLSearchParams({
-        mode,
-        q: searchQuery,
         region: "GB",
         page: String(page),
       });
+
+      Object.entries(filters || {}).forEach(([key, value]) => {
+        const trimmed = String(value || "").trim();
+        if (trimmed) params.set(key, trimmed);
+      });
+
       const res = await fetch(
         `/.netlify/functions/advancedSearchShows?${params.toString()}`
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Advanced search failed");
+      if (!res.ok) throw new Error(data?.message || "Refined search failed");
 
       const results = Array.isArray(data?.results) ? data.results : [];
       const combined = append ? mergeUniqueShows(shows, results) : results;
+      const returnedTotal = Number(data?.totalResults);
+      const safeTotal =
+        Number.isFinite(returnedTotal) && returnedTotal > 0
+          ? Math.max(returnedTotal, combined.length)
+          : combined.length;
 
       setShows(combined);
-      setMatchedLabel(data?.matched || searchQuery);
+      setActiveFilters({ ...EMPTY_FILTERS, ...(filters || {}) });
+      setAppliedFilters({
+        ...EMPTY_FILTERS,
+        ...(data?.appliedFilters || filters || {}),
+      });
+      setMatchedLabel(
+        data?.matched ||
+          Object.values(filters || {})
+            .filter(Boolean)
+            .join(" + ")
+      );
       setAdvancedPage(Number(data?.page || page));
       setHasMore(Boolean(data?.hasMore));
-      setTotalResults(Number(data?.totalResults || combined.length));
-      setActiveAdvancedQuery(searchQuery);
-      setActiveAdvancedMode(mode);
+      setTotalResults(safeTotal);
       await markAlreadySaved(combined, activeUserId);
     } catch (err) {
-      console.error("Advanced search failed:", err);
-      setError(err.message || "Advanced search failed");
+      console.error("Refined search failed:", err);
+      setError(err.message || "Refined search failed");
       if (!append) {
         setShows([]);
         resetPagination();
@@ -387,12 +427,12 @@ export default function Search() {
     const trimmedQuery = query.trim();
     if (!trimmedQuery || loading || loadingMore) return;
 
-    if (searchMode === "title") {
-      await fetchLegacySearch({ q: trimmedQuery });
-      return;
-    }
+    const nextFilters = {
+      ...activeFilters,
+      [searchMode]: trimmedQuery,
+    };
 
-    await fetchAdvancedSearch(searchMode, trimmedQuery, 1, false);
+    await fetchCombinedSearch(nextFilters, 1, false);
   }
 
   async function handleLoadMore() {
@@ -400,23 +440,49 @@ export default function Search() {
       loading ||
       loadingMore ||
       !hasMore ||
-      !activeAdvancedQuery ||
-      !activeAdvancedMode
+      !hasActiveFilters(activeFilters)
     ) {
       return;
     }
 
-    await fetchAdvancedSearch(
-      activeAdvancedMode,
-      activeAdvancedQuery,
-      advancedPage + 1,
-      true
-    );
+    await fetchCombinedSearch(activeFilters, advancedPage + 1, true);
   }
 
   function changeMode(nextMode) {
     if (nextMode === searchMode) return;
     setSearchMode(nextMode);
+    setQuery(activeFilters[nextMode] || "");
+    setError("");
+  }
+
+  async function removeFilter(filterId) {
+    const nextFilters = {
+      ...activeFilters,
+      [filterId]: "",
+    };
+    const nextApplied = {
+      ...appliedFilters,
+      [filterId]: "",
+    };
+
+    setActiveFilters(nextFilters);
+    setAppliedFilters(nextApplied);
+    setError("");
+    if (searchMode === filterId) setQuery("");
+
+    if (hasActiveFilters(nextFilters)) {
+      await fetchCombinedSearch(nextFilters, 1, false);
+      return;
+    }
+
+    setShows([]);
+    setMatchedLabel("");
+    resetPagination();
+  }
+
+  function clearAllFilters() {
+    setActiveFilters({ ...EMPTY_FILTERS });
+    setAppliedFilters({ ...EMPTY_FILTERS });
     setQuery("");
     setShows([]);
     setMatchedLabel("");
@@ -521,12 +587,42 @@ export default function Search() {
           </p>
         ) : null}
 
+        {hasActiveFilters(activeFilters) ? (
+          <div className="search-refine-wrap">
+            <div className="search-refine-head">
+              <span>Refine results</span>
+              <button
+                type="button"
+                className="search-clear-filters"
+                onClick={clearAllFilters}
+              >
+                Clear all
+              </button>
+            </div>
+            <div className="search-filter-chips">
+              {SEARCH_MODES.filter((mode) => activeFilters[mode.id]).map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  className="search-filter-chip"
+                  onClick={() => removeFilter(mode.id)}
+                  aria-label={`Remove ${mode.label} filter`}
+                >
+                  <span className="search-filter-chip-label">{mode.label}:</span>
+                  <span>{appliedFilters[mode.id] || activeFilters[mode.id]}</span>
+                  <span className="search-filter-chip-x" aria-hidden="true">×</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {error ? <p className="search-error-text">{error}</p> : null}
 
         {matchedLabel && !loading ? (
           <div className="search-match-summary">
             Showing {shows.length}
-            {totalResults > shows.length ? ` of ${totalResults}` : ""} {searchMode} results for {" "}
+            {totalResults > shows.length ? ` of ${totalResults}` : ""} results matching{" "}
             <strong>{matchedLabel}</strong>
           </div>
         ) : null}
