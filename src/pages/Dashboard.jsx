@@ -345,7 +345,8 @@ async function fetchSavedShowLibrary(userId) {
         status,
         poster_url,
         backdrop_url,
-        first_aired
+        first_aired,
+        next_aired
       `)
       .eq("user_id", userId)
       .range(from, from + pageSize - 1);
@@ -426,6 +427,91 @@ async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
   }
 
   return allRows;
+}
+
+async function fetchWatchProgressSummary(userId) {
+  if (!userId) return [];
+
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("user_show_watch_progress")
+      .select("show_id, watched_minutes")
+      .eq("user_id", userId)
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
+async function fetchUpcomingEpisodesForShowIds(showIds) {
+  if (!showIds.length) return [];
+
+  const today = startOfToday();
+  const end = new Date(today);
+  end.setDate(end.getDate() + 8);
+
+  const startKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  const endKey = [
+    end.getFullYear(),
+    String(end.getMonth() + 1).padStart(2, "0"),
+    String(end.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const rows = [];
+
+  for (const batch of chunkArray(showIds, 100)) {
+    const { data, error } = await supabase
+      .from("episodes")
+      .select("id, show_id, season_number, episode_number, name, aired_date, runtime_minutes")
+      .in("show_id", batch)
+      .gt("season_number", 0)
+      .gt("episode_number", 0)
+      .gte("aired_date", startKey)
+      .lt("aired_date", endKey)
+      .order("aired_date", { ascending: true })
+      .order("season_number", { ascending: true })
+      .order("episode_number", { ascending: true });
+
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+
+  return rows;
+}
+
+async function fetchWatchedEpisodeRowsForEpisodeIds(userId, episodeIds) {
+  if (!userId || !episodeIds.length) return [];
+
+  const rows = [];
+
+  for (const batch of chunkArray(episodeIds, 200)) {
+    const { data, error } = await supabase
+      .from("watched_episodes")
+      .select("episode_id, watched_at")
+      .eq("user_id", userId)
+      .in("episode_id", batch);
+
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+
+  return rows;
 }
 
 async function fetchTrendingShows() {
@@ -702,7 +788,12 @@ function getExternalShowLink(show, savedShows, databaseShows) {
   return null;
 }
 
-function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
+function buildPersonalDashboard(
+  savedShows,
+  episodes,
+  watchedEpisodeRows,
+  watchedMinutesTotal = null
+) {
   const watchedIds = new Set(
     (watchedEpisodeRows || []).map((row) => String(row.episode_id)).filter(Boolean)
   );
@@ -868,10 +959,13 @@ function buildPersonalDashboard(savedShows, episodes, watchedEpisodeRows) {
     })
     .slice(0, 8);
 
-  const watchedMinutes = regularEpisodes.reduce((total, episode) => {
-    if (!watchedIds.has(String(episode.id))) return total;
-    return total + Number(episode.runtime_minutes || 0);
-  }, 0);
+  const watchedMinutes =
+    watchedMinutesTotal == null
+      ? regularEpisodes.reduce((total, episode) => {
+          if (!watchedIds.has(String(episode.id))) return total;
+          return total + Number(episode.runtime_minutes || 0);
+        }, 0)
+      : Number(watchedMinutesTotal || 0);
 
   return {
     totalShows: visibleShows.length,
@@ -1387,6 +1481,7 @@ export default function Dashboard() {
           poster_url: row.poster_url || null,
           backdrop_url: row.backdrop_url || null,
           first_aired: row.first_aired || null,
+          next_aired: row.next_aired || null,
         }));
 
         const showIds = normalizedShows
@@ -1394,11 +1489,37 @@ export default function Dashboard() {
           .map((show) => show.show_id)
           .filter(Boolean);
 
-        const [watchedRows, allEpisodes, trending, premieringSoon, newsStories, friendPicks, forYou, hiddenGems] = await Promise.all([
-          showIds.length
-            ? fetchWatchedEpisodeRowsForShowIds(user.id, showIds)
+        const watchingShowIds = normalizedShows
+          .filter(
+            (show) =>
+              !isArchivedStatus(show.watch_status) &&
+              normalizeStatus(show.watch_status) === "watching"
+          )
+          .map((show) => show.show_id)
+          .filter(Boolean);
+
+        const [
+          watchingWatchedRows,
+          watchingEpisodes,
+          upcomingEpisodes,
+          watchProgressSummary,
+          trending,
+          premieringSoon,
+          newsStories,
+          friendPicks,
+          forYou,
+          hiddenGems,
+        ] = await Promise.all([
+          watchingShowIds.length
+            ? fetchWatchedEpisodeRowsForShowIds(user.id, watchingShowIds)
             : Promise.resolve([]),
-          showIds.length ? fetchEpisodesForShowIds(showIds) : Promise.resolve([]),
+          watchingShowIds.length
+            ? fetchEpisodesForShowIds(watchingShowIds)
+            : Promise.resolve([]),
+          showIds.length
+            ? fetchUpcomingEpisodesForShowIds(showIds)
+            : Promise.resolve([]),
+          fetchWatchProgressSummary(user.id),
           fetchTrendingShows().catch(() => []),
           fetchPremieringSoonShows().catch(() => []),
           fetchLatestNews(),
@@ -1406,6 +1527,30 @@ export default function Dashboard() {
           fetchForYouRecommendations(),
           fetchHiddenGems(),
         ]);
+
+        const upcomingWatchedRows = upcomingEpisodes.length
+          ? await fetchWatchedEpisodeRowsForEpisodeIds(
+              user.id,
+              upcomingEpisodes.map((episode) => episode.id).filter(Boolean)
+            )
+          : [];
+
+        const episodeMap = new Map();
+        [...watchingEpisodes, ...upcomingEpisodes].forEach((episode) => {
+          if (episode?.id) episodeMap.set(String(episode.id), episode);
+        });
+        const allEpisodes = Array.from(episodeMap.values());
+
+        const watchedMap = new Map();
+        [...watchingWatchedRows, ...upcomingWatchedRows].forEach((row) => {
+          if (row?.episode_id) watchedMap.set(String(row.episode_id), row);
+        });
+        const watchedRows = Array.from(watchedMap.values());
+
+        const watchedMinutesTotal = (watchProgressSummary || []).reduce(
+          (total, row) => total + Number(row.watched_minutes || 0),
+          0
+        );
 
         const databaseShows = await fetchDatabaseShowMatches([
           ...trending,
@@ -1432,7 +1577,12 @@ export default function Dashboard() {
           friendPicks: friendPicks.filter(
             (pick) => !showIds.some((showId) => String(showId) === String(pick.id))
           ),
-          stats: buildPersonalDashboard(normalizedShows, allEpisodes, watchedRows),
+          stats: buildPersonalDashboard(
+            normalizedShows,
+            allEpisodes,
+            watchedRows,
+            watchedMinutesTotal
+          ),
         };
 
         writeDashboardCache(user.id, freshView);
