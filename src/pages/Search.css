@@ -299,6 +299,17 @@
   border-color: rgba(255, 255, 255, 0.22);
 }
 
+.search-auto-load-sentinel {
+  min-height: 56px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
   /* The global .page rule is 100vh. On Search that was added below the
      92px mobile header, creating a false scroll area even with no results. */
