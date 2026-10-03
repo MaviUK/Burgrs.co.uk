@@ -25,6 +25,15 @@
   display: none;
 }
 
+.notifications-header > div:first-child > .notifications-count {
+  display: block;
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .notifications-muted {
   min-height: 220px;
   margin: 6px 0 0;
@@ -128,6 +137,18 @@
 .notifications-list {
   display: grid;
   gap: 12px;
+}
+
+.notifications-load-more {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 0 4px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .notification-card,
