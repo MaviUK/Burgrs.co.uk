@@ -1495,61 +1495,23 @@ export default function Rankd() {
                     : "Sign in to add these shows and build your personal ladder."}
                 </p>
               </div>
-              <div>{leaderboard.length} shows</div>
-            </div>
 
-            {isLoggedIn ? (
-              <div className="rankd-filter-shell">
-                <div className="rankd-filter-quick-row">
+              <div className="rankd-leaderboard-controls">
+                <div className="rankd-show-count">{leaderboard.length} shows</div>
+                {isLoggedIn ? (
                   <button
                     type="button"
-                    className={!filtersActive ? "is-active" : ""}
-                    onClick={() => applyQuickRankdFilter("all")}
-                  >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    className={periodFilter === "this_year" ? "is-active" : ""}
-                    onClick={() => applyQuickRankdFilter("period", "this_year")}
-                  >
-                    This year
-                  </button>
-                  <button
-                    type="button"
-                    className={periodFilter === "decade:2020" ? "is-active" : ""}
-                    onClick={() => applyQuickRankdFilter("period", "decade:2020")}
-                  >
-                    2020s
-                  </button>
-                  {[
-                    "Drama",
-                    "Comedy",
-                    "Crime",
-                    "Thriller",
-                    "Action",
-                    "Mystery",
-                    "Science Fiction",
-                    "Horror",
-                  ].map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      className={genreFilter === genre ? "is-active" : ""}
-                      onClick={() => applyQuickRankdFilter("genre", genre)}
-                    >
-                      {rankdGenreLabel(genre)}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={showFilters ? "is-active" : ""}
+                    className={`rankd-filter-toggle${showFilters || filtersActive ? " is-active" : ""}`}
                     onClick={() => setShowFilters((value) => !value)}
                   >
                     Filters
                   </button>
-                </div>
+                ) : null}
+              </div>
+            </div>
 
+            {isLoggedIn && (showFilters || filtersActive) ? (
+              <div className="rankd-filter-shell">
                 {showFilters ? (
                   <div className="rankd-filter-panel">
                     <div className="rankd-genre-picker">
