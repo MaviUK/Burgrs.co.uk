@@ -724,3 +724,21 @@
     gap: 5px;
   }
 }
+
+
+.rankd-filter-no-matchup {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.rankd-filter-no-matchup strong {
+  color: #f8fafc;
+  font-size: 0.98rem;
+}
+
+.rankd-filter-no-matchup span {
+  color: var(--text-muted);
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
