@@ -90,6 +90,62 @@ function isWatchlistStatus(value) {
   return status === "watchlist" || status === "plan_to_watch";
 }
 
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function fetchCalendarShows(userId) {
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("my_show_library_flat")
+      .select("show_id, watch_status, added_at, tvdb_id, name, poster_url")
+      .eq("user_id", userId)
+      .order("added_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
+async function fetchWatchedIdsForEpisodes(userId, episodeRows) {
+  const ids = (episodeRows || []).map((row) => row.id).filter(Boolean);
+  if (!ids.length) return new Set();
+
+  const watchedIds = new Set();
+
+  for (const batch of chunkArray(ids, 200)) {
+    const { data, error } = await supabase
+      .from("watched_episodes")
+      .select("episode_id")
+      .eq("user_id", userId)
+      .in("episode_id", batch);
+
+    if (error) throw error;
+
+    for (const row of data || []) {
+      if (row.episode_id) watchedIds.add(String(row.episode_id));
+    }
+  }
+
+  return watchedIds;
+}
+
 export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
@@ -122,48 +178,15 @@ export default function CalendarPage() {
           return;
         }
 
-        const { data: watchedRows, error: watchedError } = await supabase
-          .from("watched_episodes")
-          .select("episode_id")
-          .eq("user_id", user.id);
-
-        if (watchedError) throw watchedError;
-
-        const watchedEpisodeIds = new Set(
-          (watchedRows || [])
-            .map((row) => row.episode_id)
-            .filter(Boolean)
-            .map(String)
-        );
-
-        const { data: userShows, error: showsError } = await supabase
-          .from("user_shows_new")
-          .select(`
-            id,
-            user_id,
-            show_id,
-            watch_status,
-            added_at,
-            created_at,
-            shows!inner(
-              id,
-              tvdb_id,
-              name,
-              poster_url
-            )
-          `)
-          .eq("user_id", user.id)
-          .order("added_at", { ascending: true });
-
-        if (showsError) throw showsError;
+        const userShows = await fetchCalendarShows(user.id);
 
         const safeShows = (userShows || [])
           .filter((row) => !isArchivedStatus(row.watch_status))
           .map((row) => ({
             show_id: row.show_id,
-            tvdb_id: row.shows.tvdb_id,
-            show_name: row.shows.name || "Unknown title",
-            poster_url: row.shows.poster_url || null,
+            tvdb_id: row.tvdb_id,
+            show_name: row.name || "Unknown title",
+            poster_url: row.poster_url || null,
             watch_status: row.watch_status || null,
           }));
 
@@ -205,6 +228,11 @@ export default function CalendarPage() {
         const { data: episodeRows, error: episodesError } = await episodesQuery;
 
         if (episodesError) throw episodesError;
+
+        const watchedEpisodeIds = await fetchWatchedIdsForEpisodes(
+          user.id,
+          episodeRows || []
+        );
 
         const episodesByShow = {};
 
