@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { addShowToUserList } from "../lib/userShows";
 import { supabase } from "../lib/supabase";
+import { fetchSavedShowRows, getSavedExternalIdSets } from "../lib/savedShowLibrary";
 import { formatDate } from "../lib/date";
 import {
   getMappedShowHref,
@@ -136,42 +137,20 @@ export default function ActorPage() {
       return;
     }
 
-    const { data, error: savedError } = await supabase
-      .from("user_shows_new")
-      .select(`
-        shows!inner(
-          tvdb_id,
-          tmdb_id
-        )
-      `)
-      .eq("user_id", userId);
+    try {
+      const rows = await fetchSavedShowRows(userId);
+      const saved = getSavedExternalIdSets(rows);
 
-    if (savedError) {
+      const latestUserId = await getCurrentUserId();
+      if (latestUserId !== userId) return;
+
+      setSavedTvdbIds(saved.tvdb);
+      setSavedTmdbIds(saved.tmdb);
+    } catch (savedError) {
       console.warn("Failed loading saved ids", savedError);
       setSavedTvdbIds(new Set());
       setSavedTmdbIds(new Set());
-      return;
     }
-
-    const latestUserId = await getCurrentUserId();
-    if (latestUserId !== userId) return;
-
-    const tvdbIds = new Set(
-      (data || [])
-        .map((row) => row?.shows?.tvdb_id)
-        .filter(Boolean)
-        .map(String)
-    );
-
-    const tmdbIds = new Set(
-      (data || [])
-        .map((row) => row?.shows?.tmdb_id)
-        .filter(Boolean)
-        .map(String)
-    );
-
-    setSavedTvdbIds(tvdbIds);
-    setSavedTmdbIds(tmdbIds);
   }
 
   useEffect(() => {
