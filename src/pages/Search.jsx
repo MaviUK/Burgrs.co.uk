@@ -24,6 +24,7 @@ const EMPTY_FILTERS = {
 const SORT_OPTIONS = [
   { id: "default", label: "Default" },
   { id: "highest-rated", label: "Highest rated" },
+  { id: "lowest-rated", label: "Lowest rated" },
   { id: "most-popular", label: "Most popular" },
   { id: "newest", label: "Newest first" },
   { id: "oldest", label: "Oldest first" },
@@ -163,6 +164,23 @@ function sortLoadedShows(items, sort) {
       const ratingDiff =
         Number(getRatingPercent(b) || 0) - Number(getRatingPercent(a) || 0);
       if (ratingDiff) return ratingDiff;
+      return Number(b?.rating_count || b?.vote_count || 0) -
+        Number(a?.rating_count || a?.vote_count || 0);
+    });
+  }
+
+  if (sort === "lowest-rated") {
+    return results.sort((a, b) => {
+      const aRating = getRatingPercent(a);
+      const bRating = getRatingPercent(b);
+
+      if (aRating == null && bRating == null) return 0;
+      if (aRating == null) return 1;
+      if (bRating == null) return -1;
+
+      const ratingDiff = Number(aRating) - Number(bRating);
+      if (ratingDiff) return ratingDiff;
+
       return Number(b?.rating_count || b?.vote_count || 0) -
         Number(a?.rating_count || a?.vote_count || 0);
     });
