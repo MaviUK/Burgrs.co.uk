@@ -244,11 +244,6 @@ export default function Search() {
     [searchMode]
   );
 
-  const displayedShows = useMemo(
-    () => sortLoadedShows(shows, sortOrder),
-    [shows, sortOrder]
-  );
-
   const isPureNetworkBrowse =
     Boolean(networkFilter) &&
     !genreFilter &&
@@ -563,15 +558,18 @@ export default function Search() {
     loadingMore,
     advancedPage,
     activeFilters,
+    sortOrder,
   ]);
 
   async function handleSortChange(nextSort) {
+    const previousSort = sortOrder;
+
+    // Reorder the cards immediately in the browser. This makes the selected
+    // sort visible at once and does not depend on the follow-up API request.
     setSortOrder(nextSort);
+    setShows((currentShows) => sortLoadedShows(currentShows, nextSort));
 
     if (!hasActiveFilters(activeFilters) || loading || loadingMore) return;
-
-    const previousSort = sortOrder;
-    setSortOrder(nextSort);
 
     try {
       const activeUserId = await getCurrentUserId();
@@ -620,6 +618,17 @@ export default function Search() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (sortOrder === "default" || !shows.length) return;
+    setShows((currentShows) => {
+      const sorted = sortLoadedShows(currentShows, sortOrder);
+      const unchanged = sorted.every(
+        (show, index) => getResultKey(show) === getResultKey(currentShows[index])
+      );
+      return unchanged ? currentShows : sorted;
+    });
+  }, [sortOrder]);
 
   function changeMode(nextMode) {
     if (nextMode === searchMode) return;
@@ -820,7 +829,7 @@ export default function Search() {
         ) : null}
 
         <div className="search-results-list">
-          {displayedShows.map((show) => {
+          {shows.map((show) => {
             const resultKey = getResultKey(show);
             const savedByTvdb = Boolean(
               show.tvdb_id && savedTvdbIds.has(String(show.tvdb_id))
