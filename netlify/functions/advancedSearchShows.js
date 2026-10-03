@@ -534,6 +534,38 @@ async function enrichSearchResults(results, region) {
   );
 }
 
+async function fetchTmdbDiscoverRange(params, startIndex, count) {
+  if (count <= 0) return [];
+
+  const firstPage = Math.floor(startIndex / PAGE_SIZE) + 1;
+  const lastIndex = startIndex + count - 1;
+  const lastPage = Math.floor(lastIndex / PAGE_SIZE) + 1;
+  const pageNumbers = [];
+
+  for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
+    if (pageNumber <= MAX_TMDB_PAGE) pageNumbers.push(pageNumber);
+  }
+
+  const responses = await Promise.all(
+    pageNumbers.map((pageNumber) =>
+      tmdbFetch("/discover/tv", {
+        ...params,
+        page: String(pageNumber),
+      })
+    )
+  );
+
+  const combined = responses.flatMap((data) =>
+    Array.isArray(data?.results) ? data.results : []
+  );
+  const offsetWithinFirstPage = startIndex - (firstPage - 1) * PAGE_SIZE;
+
+  return combined.slice(
+    offsetWithinFirstPage,
+    offsetWithinFirstPage + count
+  );
+}
+
 export async function handler(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
@@ -786,10 +818,6 @@ export async function handler(event) {
       include_null_first_air_dates: "false",
     };
 
-    if (sort === "lowest-rated") {
-      discoverParams["vote_count.gte"] = "1";
-    }
-
     if (genre) {
       discoverParams.with_genres = String(genre.id);
     }
@@ -806,6 +834,87 @@ export async function handler(event) {
 
     if (company) {
       discoverParams.with_companies = String(company.id);
+    }
+
+    if (sort === "lowest-rated") {
+      const baseParams = { ...discoverParams };
+      delete baseParams.page;
+      delete baseParams.sort_by;
+
+      const [allProbe, ratedProbe] = await Promise.all([
+        tmdbFetch("/discover/tv", {
+          ...baseParams,
+          page: "1",
+          sort_by: "popularity.desc",
+        }),
+        tmdbFetch("/discover/tv", {
+          ...baseParams,
+          page: "1",
+          sort_by: "vote_average.asc",
+          "vote_count.gte": "1",
+        }),
+      ]);
+
+      const allTotal = Math.max(0, Number(allProbe?.total_results || 0));
+      const ratedTotal = Math.min(
+        allTotal,
+        Math.max(0, Number(ratedProbe?.total_results || 0))
+      );
+      const totalPages = Math.min(
+        MAX_TMDB_PAGE,
+        Math.max(1, Math.ceil(allTotal / PAGE_SIZE))
+      );
+
+      const startIndex = (page - 1) * PAGE_SIZE;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, allTotal);
+
+      const ratedStart = Math.min(startIndex, ratedTotal);
+      const ratedEnd = Math.min(endIndex, ratedTotal);
+      const ratedCount = Math.max(0, ratedEnd - ratedStart);
+
+      const unratedStart = Math.max(0, startIndex - ratedTotal);
+      const unratedEnd = Math.max(0, endIndex - ratedTotal);
+      const unratedCount = Math.max(0, unratedEnd - unratedStart);
+
+      const [ratedItems, unratedItems] = await Promise.all([
+        fetchTmdbDiscoverRange(
+          {
+            ...baseParams,
+            sort_by: "vote_average.asc",
+            "vote_count.gte": "1",
+          },
+          ratedStart,
+          ratedCount
+        ),
+        fetchTmdbDiscoverRange(
+          {
+            ...baseParams,
+            sort_by: "popularity.desc",
+            "vote_count.lte": "0",
+          },
+          unratedStart,
+          unratedCount
+        ),
+      ]);
+
+      let results = [...ratedItems, ...unratedItems]
+        .map((item) => normalizeCombinedResult(item, context, genreMap))
+        .filter((item) => item.tmdb_id);
+      results = await enrichSearchResults(results, region);
+
+      return response(200, {
+        mode: "combined",
+        query: Object.values(filters).filter(Boolean).join(" + "),
+        matched: Object.values(appliedFilters).join(" + "),
+        appliedFilters,
+        page,
+        totalPages,
+        totalResults: allTotal,
+        hasMore: page < totalPages,
+        results,
+        matchType: "combined-discover-lowest-rated",
+        sort,
+      });
     }
 
     const discovered = await tmdbFetch("/discover/tv", discoverParams);
