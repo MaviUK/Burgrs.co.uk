@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { fetchSavedShowRows } from "./lib/savedShowLibrary";
 
 const resolvedAiringLinks = new Map();
 const CONTINUE_WATCHING_PATH = "/my-shows?filter=continue";
@@ -190,15 +191,9 @@ async function fetchContinueWatchingEligibleShows() {
   const userId = session?.user?.id;
   if (!userId) return { tvdb: new Set(), tmdb: new Set() };
 
-  const { data: showRows, error: showsError } = await supabase
-    .from("user_shows_new")
-    .select("show_id, watch_status, shows!inner(tvdb_id, tmdb_id)")
-    .eq("user_id", userId)
-    .eq("watch_status", "watching");
-
-  if (showsError) throw showsError;
-
-  const savedRows = (showRows || []).filter((row) => row?.show_id);
+  const savedRows = (await fetchSavedShowRows(userId, {
+    watchStatus: "watching",
+  })).filter((row) => row?.show_id);
   const showIds = savedRows.map((row) => row.show_id);
   if (!showIds.length) return { tvdb: new Set(), tmdb: new Set() };
 
@@ -233,10 +228,9 @@ async function fetchContinueWatchingEligibleShows() {
 
     while (!done) {
       const { data, error } = await supabase
-        .from("watched_episodes")
-        .select("episode_id, episodes!inner(show_id)")
-        .eq("user_id", userId)
-        .in("episodes.show_id", batch)
+        .rpc("get_watched_episode_rows_for_shows", {
+          p_show_ids: batch,
+        })
         .range(from, from + pageSize - 1);
 
       if (error) throw error;
@@ -260,8 +254,8 @@ async function fetchContinueWatchingEligibleShows() {
 
   savedRows.forEach((row) => {
     if (!hasUnwatchedAiredByShow.has(String(row.show_id))) return;
-    if (row.shows?.tvdb_id) tvdb.add(String(row.shows.tvdb_id));
-    if (row.shows?.tmdb_id) tmdb.add(String(row.shows.tmdb_id));
+    if (row.tvdb_id) tvdb.add(String(row.tvdb_id));
+    if (row.tmdb_id) tmdb.add(String(row.tmdb_id));
   });
 
   return { tvdb, tmdb };
