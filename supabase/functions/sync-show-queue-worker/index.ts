@@ -144,32 +144,70 @@ function episodeMetadataPatch(row: any) {
 }
 
 async function upsertEpisodeBatch(batch: any[]) {
-  const { error } = await supabase.from("episodes").upsert(batch, {
-    onConflict: "show_id,season_type,season_number,episode_number",
-  });
+  const tvdbIds = batch
+    .map((row) => row.tvdb_id)
+    .filter((value) => value != null);
 
-  if (!error) return;
-  if (String(error.code || "") !== "23505") throw error;
+  const existingByTvdb = new Map<string, any>();
+
+  if (tvdbIds.length) {
+    const { data: existingRows, error: existingError } = await supabase
+      .from("episodes")
+      .select("tvdb_id,show_id,season_type,season_number,episode_number")
+      .in("tvdb_id", tvdbIds);
+
+    if (existingError) throw existingError;
+
+    for (const row of existingRows || []) {
+      if (row.tvdb_id != null) existingByTvdb.set(String(row.tvdb_id), row);
+    }
+  }
+
+  const safeRows: any[] = [];
+  const legacyRows: any[] = [];
 
   for (const row of batch) {
-    const { error: rowError } = await supabase.from("episodes").upsert(row, {
+    const existing =
+      row.tvdb_id == null ? null : existingByTvdb.get(String(row.tvdb_id));
+
+    if (!existing) {
+      safeRows.push(row);
+      continue;
+    }
+
+    if (String(existing.show_id) !== String(row.show_id)) {
+      throw new Error(
+        `TVDB episode ${row.tvdb_id} is already linked to another show`
+      );
+    }
+
+    const sameSlot =
+      String(existing.season_type || "") === String(row.season_type || "") &&
+      Number(existing.season_number) === Number(row.season_number) &&
+      Number(existing.episode_number) === Number(row.episode_number);
+
+    if (sameSlot) safeRows.push(row);
+    else legacyRows.push(row);
+  }
+
+  if (safeRows.length) {
+    const { error } = await supabase.from("episodes").upsert(safeRows, {
       onConflict: "show_id,season_type,season_number,episode_number",
     });
 
-    if (!rowError) continue;
+    if (error) throw error;
+  }
 
-    if (String(rowError.code || "") !== "23505" || row.tvdb_id == null) {
-      throw rowError;
-    }
-
-    const { error: legacyError } = await supabase
+  for (const row of legacyRows) {
+    const { error } = await supabase
       .from("episodes")
       .update(episodeMetadataPatch(row))
       .eq("tvdb_id", row.tvdb_id);
 
-    if (legacyError) throw legacyError;
+    if (error) throw error;
   }
 }
+
 async function syncOne(job: any, token: string) {
   const now = new Date().toISOString();
   const seriesPayload = await tvdbJson(`/series/${job.tvdb_id}/extended`, token);
