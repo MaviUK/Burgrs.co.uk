@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
   deleteNotifications,
+  getUnreadNotificationCount,
   markNotificationsRead,
   shouldIgnoreNotificationError,
 } from "../lib/notifications";
 import "./Notifications.css";
 
 const NOTIFICATIONS_CHANGED_EVENT = "burgrs:notifications-changed";
+const NOTIFICATION_PAGE_SIZE = 50;
 
 function formatDate(value) {
   if (!value) return "";
@@ -87,6 +89,107 @@ async function fetchRowsByIds(table, ids, columns) {
   return data || [];
 }
 
+
+async function enrichNotificationRows(notificationRows) {
+  if (!notificationRows.length) return [];
+
+  const actorIds = Array.from(
+    new Set(notificationRows.map((item) => item.actor_user_id).filter(Boolean))
+  );
+  const reviewIds = notificationRows
+    .filter((item) => item.type === "review_reply" && item.entity_id)
+    .map((item) => item.entity_id);
+  const chatIds = notificationRows
+    .filter((item) => item.type === "chat_reply" && item.entity_id)
+    .map((item) => item.entity_id);
+
+  const [profileRows, reviewRows, chatRows] = await Promise.all([
+    fetchRowsByIds(
+      "profiles",
+      actorIds,
+      "id, username, full_name, display_name, avatar_url"
+    ),
+    fetchRowsByIds("show_reviews", reviewIds, "id, show_id"),
+    fetchRowsByIds("show_chat_messages", chatIds, "id, show_id"),
+  ]);
+
+  const profileMap = new Map(
+    profileRows.map((profile) => [String(profile.id), profile])
+  );
+  const targetShowMap = new Map();
+
+  reviewRows.forEach((row) => {
+    if (row?.id && row?.show_id) {
+      targetShowMap.set(String(row.id), row.show_id);
+    }
+  });
+
+  chatRows.forEach((row) => {
+    if (row?.id && row?.show_id) {
+      targetShowMap.set(String(row.id), row.show_id);
+    }
+  });
+
+  const showIds = Array.from(
+    new Set(
+      notificationRows
+        .map(
+          (item) =>
+            item?.meta?.show_id ||
+            targetShowMap.get(String(item.entity_id || "")) ||
+            null
+        )
+        .filter(Boolean)
+    )
+  );
+
+  const showRows = await fetchRowsByIds(
+    "shows",
+    showIds,
+    "id, name, tvdb_id, tmdb_id, poster_url"
+  );
+  const showMap = new Map(
+    showRows.map((show) => [String(show.id), show])
+  );
+
+  return notificationRows.map((item) => {
+    const showId =
+      item?.meta?.show_id ||
+      targetShowMap.get(String(item.entity_id || "")) ||
+      null;
+
+    return {
+      ...item,
+      actor_profile:
+        profileMap.get(String(item.actor_user_id || "")) || null,
+      show: showId ? showMap.get(String(showId)) || null : null,
+    };
+  });
+}
+
+async function fetchNotificationPage(userId, offset = 0) {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select(
+      "id, recipient_user_id, actor_user_id, type, title, body, url, entity_table, entity_id, meta, read_at, created_at"
+    )
+    .eq("recipient_user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + NOTIFICATION_PAGE_SIZE - 1);
+
+  if (error) throw error;
+
+  const rawRows = data || [];
+  const visibleRows = rawRows.filter((item) => !isDeletedNotification(item));
+  const enrichedItems = await enrichNotificationRows(visibleRows);
+
+  return {
+    items: enrichedItems,
+    rawCount: rawRows.length,
+    hasMore: rawRows.length === NOTIFICATION_PAGE_SIZE,
+  };
+}
+
 export default function Notifications() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -98,6 +201,12 @@ export default function Notifications() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef(null);
 
   const unreadIds = useMemo(
     () => items.filter((item) => !item.read_at).map((item) => item.id),
@@ -144,112 +253,74 @@ export default function Notifications() {
 
       const user = authData?.user || null;
       if (!user?.id) {
+        setCurrentUserId(null);
         setItems([]);
+        setUnreadCount(0);
+        setNextOffset(0);
+        setHasMore(false);
         return;
       }
 
-      const { data, error: loadError } = await supabase
-        .from("notifications")
-        .select(
-          "id, recipient_user_id, actor_user_id, type, title, body, url, entity_table, entity_id, meta, read_at, created_at"
-        )
-        .eq("recipient_user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(60);
+      setCurrentUserId(user.id);
 
-      if (loadError) throw loadError;
-
-      const notificationRows = (data || []).filter(
-        (item) => !isDeletedNotification(item)
-      );
-
-      const actorIds = Array.from(
-        new Set(notificationRows.map((item) => item.actor_user_id).filter(Boolean))
-      );
-      const reviewIds = notificationRows
-        .filter((item) => item.type === "review_reply" && item.entity_id)
-        .map((item) => item.entity_id);
-      const chatIds = notificationRows
-        .filter((item) => item.type === "chat_reply" && item.entity_id)
-        .map((item) => item.entity_id);
-
-      const [profileRows, reviewRows, chatRows] = await Promise.all([
-        fetchRowsByIds(
-          "profiles",
-          actorIds,
-          "id, username, full_name, display_name, avatar_url"
-        ),
-        fetchRowsByIds("show_reviews", reviewIds, "id, show_id"),
-        fetchRowsByIds("show_chat_messages", chatIds, "id, show_id"),
+      const [page, nextUnreadCount] = await Promise.all([
+        fetchNotificationPage(user.id, 0),
+        getUnreadNotificationCount(user.id),
       ]);
 
-      const profileMap = new Map(
-        profileRows.map((profile) => [String(profile.id), profile])
-      );
-      const targetShowMap = new Map();
-
-      reviewRows.forEach((row) => {
-        if (row?.id && row?.show_id) {
-          targetShowMap.set(String(row.id), row.show_id);
-        }
-      });
-
-      chatRows.forEach((row) => {
-        if (row?.id && row?.show_id) {
-          targetShowMap.set(String(row.id), row.show_id);
-        }
-      });
-
-      const showIds = Array.from(
-        new Set(
-          notificationRows
-            .map(
-              (item) =>
-                item?.meta?.show_id ||
-                targetShowMap.get(String(item.entity_id || "")) ||
-                null
-            )
-            .filter(Boolean)
-        )
-      );
-
-      const showRows = await fetchRowsByIds(
-        "shows",
-        showIds,
-        "id, name, tvdb_id, tmdb_id, poster_url"
-      );
-      const showMap = new Map(
-        showRows.map((show) => [String(show.id), show])
-      );
-
-      const enrichedItems = notificationRows.map((item) => {
-        const showId =
-          item?.meta?.show_id ||
-          targetShowMap.get(String(item.entity_id || "")) ||
-          null;
-
-        return {
-          ...item,
-          actor_profile:
-            profileMap.get(String(item.actor_user_id || "")) || null,
-          show: showId ? showMap.get(String(showId)) || null : null,
-        };
-      });
-
-      setItems(enrichedItems);
+      setItems(page.items);
+      setUnreadCount(nextUnreadCount);
+      setNextOffset(page.rawCount);
+      setHasMore(page.hasMore);
     } catch (err) {
       console.error("Failed loading notifications:", err);
 
       if (shouldIgnoreNotificationError(err)) {
         setTableMissing(true);
         setItems([]);
+        setUnreadCount(0);
+        setHasMore(false);
         return;
       }
 
       setError(err.message || "Failed loading notifications.");
       setItems([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMoreNotifications() {
+    if (
+      !currentUserId ||
+      !hasMore ||
+      loading ||
+      loadingMore
+    ) {
+      return;
+    }
+
+    setLoadingMore(true);
+
+    try {
+      const page = await fetchNotificationPage(currentUserId, nextOffset);
+
+      setItems((current) => {
+        const seen = new Set(current.map((item) => String(item.id)));
+        return [
+          ...current,
+          ...page.items.filter((item) => !seen.has(String(item.id))),
+        ];
+      });
+      setNextOffset((current) => current + page.rawCount);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      console.error("Failed loading older notifications:", err);
+      setError(err.message || "Could not load older notifications.");
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -257,24 +328,46 @@ export default function Notifications() {
     loadNotifications();
   }, []);
 
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore || loading || loadingMore) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreNotifications();
+        }
+      },
+      { rootMargin: "320px 0px" }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [currentUserId, hasMore, loading, loadingMore, nextOffset]);
+
+
   async function markAllViewed() {
-    if (!unreadIds.length || markingAllViewed) return;
+    if (!currentUserId || !unreadCount || markingAllViewed) return;
 
     setMarkingAllViewed(true);
     setError("");
 
     try {
-      const result = await markNotificationsRead(unreadIds);
-      if (!result.ok) {
-        throw result.error || new Error("Could not mark notifications as viewed.");
-      }
-
       const now = new Date().toISOString();
+      const { error: markError } = await supabase
+        .from("notifications")
+        .update({ read_at: now })
+        .eq("recipient_user_id", currentUserId)
+        .is("read_at", null);
+
+      if (markError) throw markError;
+
       setItems((current) =>
         current.map((item) =>
           item.read_at ? item : { ...item, read_at: now }
         )
       );
+      setUnreadCount(0);
       notifyBadgeChanged();
     } catch (err) {
       console.error("Failed marking all notifications viewed:", err);
@@ -283,6 +376,7 @@ export default function Notifications() {
       setMarkingAllViewed(false);
     }
   }
+
 
   async function deleteSelectedNotifications() {
     const ids = Array.from(selectedIds);
@@ -303,6 +397,9 @@ export default function Notifications() {
       );
       setSelectedIds(new Set());
       setSelectionMode(false);
+      if (currentUserId) {
+        setUnreadCount(await getUnreadNotificationCount(currentUserId));
+      }
       notifyBadgeChanged();
     } catch (err) {
       console.error("Failed deleting selected notifications:", err);
@@ -376,6 +473,7 @@ export default function Notifications() {
                 : currentItem
             )
           );
+          setUnreadCount((count) => Math.max(0, count - 1));
           notifyBadgeChanged();
         }
       }
@@ -398,7 +496,7 @@ export default function Notifications() {
         </div>
 
         <div className="notifications-header-actions">
-          {!selectionMode && unreadIds.length ? (
+          {!selectionMode && unreadCount > 0 ? (
             <button
               type="button"
               onClick={markAllViewed}
@@ -460,6 +558,7 @@ export default function Notifications() {
       ) : loading ? (
         <p className="notifications-muted">Loading notifications...</p>
       ) : items.length ? (
+        <>
         <section className="notifications-list">
           {items.map((item) => {
             const actorName = getProfileName(item.actor_profile);
@@ -554,6 +653,16 @@ export default function Notifications() {
             );
           })}
         </section>
+        {hasMore || loadingMore ? (
+          <div
+            ref={loadMoreRef}
+            className="notifications-load-more"
+            aria-live="polite"
+          >
+            {loadingMore ? "Loading older notifications..." : "Scroll for older notifications"}
+          </div>
+        ) : null}
+        </>
       ) : (
         <section className="notifications-empty">
           <h2>No notifications yet</h2>
