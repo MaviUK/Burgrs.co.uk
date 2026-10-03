@@ -7,7 +7,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MY_SHOWS_CACHE_PREFIX = "trackt_my_shows_cache_v1";
 const DASHBOARD_CACHE_PREFIX = "trackt_dashboard_cache_v6_SAVED_SHOW_ID_LINKS";
 const MY_SHOWS_CACHE_SCHEMA_KEY = "burgrs_my_shows_cache_schema";
-const MY_SHOWS_CACHE_SCHEMA_VERSION = "2";
+const MY_SHOWS_CACHE_SCHEMA_VERSION = "3";
 const USER_SHOWS_PAGE_SIZE = 1000;
 
 function clearStoredShowCaches() {
