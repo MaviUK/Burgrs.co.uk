@@ -218,6 +218,14 @@ function getSavedShowLink(show) {
   return "/my-shows";
 }
 
+function getSavedEpisodeLink(show, episode) {
+  const showLink = getSavedShowLink(show);
+  const episodeId = episode?.id;
+
+  if (!episodeId || showLink === "/my-shows") return showLink;
+  return `${showLink}?episode=${encodeURIComponent(String(episodeId))}`;
+}
+
 const upcomingProviderCache = new Map();
 
 function providerLogoUrl(provider) {
@@ -1055,7 +1063,7 @@ function UpNextHero({ item }) {
 
   return (
     <Link
-      to={getSavedShowLink(show)}
+      to={getSavedEpisodeLink(show, episode)}
       className="up-next-hero"
       style={backgroundImage ? { backgroundImage: `url("${backgroundImage}")` } : undefined}
     >
