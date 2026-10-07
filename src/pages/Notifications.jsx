@@ -573,6 +573,8 @@ export default function Notifications() {
               "new_season",
               "season_premiere_date",
               "for_you_recommendation",
+              "tv_news",
+              "show_platform_change",
             ].includes(item.type);
             const thumbnailUrl = usesShowArtwork
               ? item.show?.poster_url || ""
