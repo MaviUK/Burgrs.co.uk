@@ -69,6 +69,25 @@ async function fetchAllEpisodes(seriesId: number, token: string) {
   }
   return rows;
 }
+async function fetchTmdbProviderNames(tmdbId: number | null) {
+  const key = Deno.env.get("TMDB_API_KEY") || "";
+  if (!key || !tmdbId) return [];
+  try {
+    const endpoint = "https://api.themoviedb.org/3/tv/" + tmdbId + "/watch/providers?api_key=" + encodeURIComponent(key);
+    const r = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return [];
+    const payload = await r.json();
+    const region = payload?.results?.GB || null;
+    const rows = [
+      ...(region?.flatrate || []),
+      ...(region?.free || []),
+      ...(region?.ads || []),
+    ];
+    return Array.from(new Set(rows.map((row: any) => String(row?.provider_name || "").trim()).filter(Boolean))).sort();
+  } catch {
+    return [];
+  }
+}
 function pickArtwork(series: any, types: number[]) {
   for (const type of types) {
     const hit = Array.isArray(series?.artworks)
@@ -210,6 +229,13 @@ async function upsertEpisodeBatch(batch: any[]) {
 
 async function syncOne(job: any, token: string) {
   const now = new Date().toISOString();
+  const { data: existingShow, error: existingShowError } = await supabase
+    .from("shows")
+    .select("network,tmdb_id")
+    .eq("id", job.show_id)
+    .maybeSingle();
+  if (existingShowError) throw existingShowError;
+
   const seriesPayload = await tvdbJson(`/series/${job.tvdb_id}/extended`, token);
   const series = seriesPayload?.data;
   if (!series) throw new Error("TVDB returned no series data");
@@ -244,6 +270,15 @@ async function syncOne(job: any, token: string) {
 
   const { error: showError } = await supabase.from("shows").update(showUpdate).eq("id", job.show_id);
   if (showError) throw showError;
+
+  const providerNames = await fetchTmdbProviderNames(normalizeNumber(existingShow?.tmdb_id));
+  const { error: platformStateError } = await supabase.rpc("record_show_platform_snapshot", {
+    p_show_id: job.show_id,
+    p_network: showUpdate.network,
+    p_provider_names: providerNames,
+    p_region: "GB",
+  });
+  if (platformStateError) console.warn("Platform snapshot failed", platformStateError);
 
   const seasonByNumber = new Map<number, any>();
   for (const season of Array.isArray(series?.seasons) ? series.seasons : []) {
