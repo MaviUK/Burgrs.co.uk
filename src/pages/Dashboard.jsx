@@ -5,7 +5,7 @@ import { formatDate } from "../lib/date";
 import { addShowToUserList } from "../lib/userShows";
 import "./Dashboard.css";
 
-const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v19_EMPTY_STATES";
+const DASHBOARD_CACHE_PREFIX = "burgrs_dashboard_cache_v20_CAUGHT_UP_AIRING";
 const DASHBOARD_CACHE_DURATION = 1000 * 60 * 15;
 const DASHBOARD_PUBLIC_CACHE_KEY = `${DASHBOARD_CACHE_PREFIX}:public`;
 
@@ -441,13 +441,15 @@ async function fetchWatchedEpisodeRowsForShowIds(userId, showIds) {
 async function fetchUpcomingEpisodesForUser(userId) {
   if (!userId) return [];
 
-  const { data, error } = await supabase
-    .from("my_upcoming_episodes")
-    .select("id, show_id, season_number, episode_number, name, aired_date, runtime_minutes")
-    .eq("user_id", userId)
-    .order("aired_date", { ascending: true })
-    .order("season_number", { ascending: true })
-    .order("episode_number", { ascending: true });
+  const today = normalizeDateOnly(new Date());
+  const through = new Date();
+  through.setDate(through.getDate() + 8);
+  const toDate = normalizeDateOnly(through);
+
+  const { data, error } = await supabase.rpc("get_my_eligible_upcoming_episodes", {
+    p_from_date: today,
+    p_to_date: toDate,
+  });
 
   if (error) throw error;
   return data || [];
