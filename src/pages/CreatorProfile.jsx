@@ -1,3 +1,4 @@
+import CreatorPostBody from "../components/CreatorPostBody";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -2328,7 +2329,7 @@ export default function CreatorProfile() {
                           <img src={post.image_url} alt="" className="creator-post-image" />
                         ) : null}
                         {post.title ? <h3>{post.title}</h3> : null}
-                        {post.body ? <p>{post.body}</p> : null}
+                        <CreatorPostBody post={post} />
                       </>
                     )}
 

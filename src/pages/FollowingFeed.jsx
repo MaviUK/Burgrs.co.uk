@@ -1,3 +1,4 @@
+import CreatorPostBody from "../components/CreatorPostBody";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import FeedComments from "../components/FeedComments";
@@ -987,7 +988,7 @@ export default function FollowingFeed() {
                         <img src={post.image_url} alt="" className="following-post-image" />
                       ) : null}
                       {post.title ? <h2 className="following-post-title">{post.title}</h2> : null}
-                      {post.body ? <p className="following-review-text">{post.body}</p> : null}
+                      <CreatorPostBody post={post} className="following-review-text" />
                     </>
                   )}
 

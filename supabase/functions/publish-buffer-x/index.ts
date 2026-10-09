@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
       const data = await buffer(CREATE, { input: {
         channelId: settings.channel_id, text: formatPost(post, profile.username),
         schedulingType: 'automatic', mode: 'addToQueue', assets: artwork, needsApproval: false,
-        aiAssisted: Boolean(post.is_auto_news),
+        aiAssisted: Boolean(post.is_auto_news || post.is_auto_season_review),
       } }, true);
       const result = data?.createPost;
       if (!result?.post?.id) {
