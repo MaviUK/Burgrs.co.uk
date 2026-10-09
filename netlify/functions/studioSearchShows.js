@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 const TVDB_BASE = "https://api4.thetvdb.com/v4";
 const PAGE_SIZE = 20;
 const MAX_RESULTS = 5000;
@@ -384,7 +385,7 @@ async function getStudioCatalogue(token, studioName, page) {
   };
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
   }
@@ -432,3 +433,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["q","query","page"]});

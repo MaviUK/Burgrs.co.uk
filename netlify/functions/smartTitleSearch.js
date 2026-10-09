@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 function normalizeText(value) {
   return String(value || "")
     .toLowerCase()
@@ -295,7 +296,7 @@ function normalizeResult(item, query) {
   };
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const query = event.queryStringParameters?.q?.trim() || "";
     if (query.length < 2) {
@@ -359,3 +360,5 @@ export async function handler(event) {
     };
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["q"]});

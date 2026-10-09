@@ -1,3 +1,4 @@
+import { createJsonCache, mapConcurrent, withPublicCache } from "./_publicDataCache.js";
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p";
 const TVDB_BASE = "https://api4.thetvdb.com/v4";
@@ -8,6 +9,7 @@ const MAX_TVDB_RESULTS = 5000;
 
 let tvdbToken = null;
 let tvdbTokenExpiresAt = 0;
+const cachedTmdbJson = createJsonCache();
 
 function response(statusCode, body) {
   return {
@@ -30,14 +32,7 @@ async function tmdbFetch(path, params = {}) {
     ...params,
   });
 
-  const res = await fetch(`${TMDB_BASE}${path}?${searchParams.toString()}`);
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data?.status_message || `TMDB request failed (${res.status})`);
-  }
-
-  return data;
+  return cachedTmdbJson(`${TMDB_BASE}${path}?${searchParams.toString()}`);
 }
 
 async function getTvdbToken() {
@@ -500,8 +495,8 @@ function getStreamingProviders(regionData) {
 }
 
 async function enrichSearchResults(results, region) {
-  return Promise.all(
-    (results || []).map(async (result) => {
+  return mapConcurrent(
+    results || [], async (result) => {
       if (!result?.tmdb_id) return result;
 
       try {
@@ -530,7 +525,7 @@ async function enrichSearchResults(results, region) {
         console.warn("Search result enrichment failed", result?.tmdb_id, detailError);
         return result;
       }
-    })
+    }
   );
 }
 
@@ -546,13 +541,12 @@ async function fetchTmdbDiscoverRange(params, startIndex, count) {
     if (pageNumber <= MAX_TMDB_PAGE) pageNumbers.push(pageNumber);
   }
 
-  const responses = await Promise.all(
-    pageNumbers.map((pageNumber) =>
+  const responses = await mapConcurrent(
+    pageNumbers, (pageNumber) =>
       tmdbFetch("/discover/tv", {
         ...params,
         page: String(pageNumber),
       })
-    )
   );
 
   const combined = responses.flatMap((data) =>
@@ -566,7 +560,7 @@ async function fetchTmdbDiscoverRange(params, startIndex, count) {
   );
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
   }
@@ -683,14 +677,13 @@ export async function handler(event) {
           (_, index) => index + 1
         ).filter((pageNumber) => pageNumber !== requestedTmdbPage);
 
-        const pageResponses = await Promise.all(
-          otherPages.map((pageNumber) =>
+        const pageResponses = await mapConcurrent(
+          otherPages, (pageNumber) =>
             tmdbFetch("/search/tv", {
               query: filters.title,
               page: String(pageNumber),
               include_adult: "false",
             })
-          )
         );
 
         rawResults = [
@@ -720,8 +713,8 @@ export async function handler(event) {
       }
 
       if (provider || company) {
-        const checked = await Promise.all(
-          rawResults.map(async (item) => {
+        const checked = await mapConcurrent(
+          rawResults, async (item) => {
             try {
               const detail = await tmdbFetch(`/tv/${item.id}`, {
                 append_to_response: "watch/providers",
@@ -749,7 +742,7 @@ export async function handler(event) {
               console.warn("Combined title filter detail lookup failed", item?.id, detailError);
               return null;
             }
-          })
+          }
         );
         rawResults = checked.filter(Boolean);
       }
@@ -945,3 +938,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["mode","q","region","page","sort","title","genre","year","platform","studio"]});

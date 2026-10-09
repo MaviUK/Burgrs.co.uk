@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 function extractEnglishTranslationValue(translations, key) {
   if (!translations) return null;
 
@@ -162,7 +163,7 @@ function dedupeEpisodes(episodes) {
   });
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const tvdbId = event.queryStringParameters?.tvdb_id;
 
@@ -315,3 +316,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":900,"stale":120,"query":["tvdb_id"]});

@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 const TVDB_BASE_URL = "https://api4.thetvdb.com/v4";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
@@ -931,7 +932,7 @@ async function getTmdbProvidersTrailerBackdropAndCrew(
   }
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const tvdbIdRaw = event.queryStringParameters?.tvdbId;
     const tvdbId = Number(tvdbIdRaw);
@@ -1046,3 +1047,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":1800,"stale":300,"query":["tvdbId"]});

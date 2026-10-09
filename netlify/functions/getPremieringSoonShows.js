@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 import { persistDiscoveryShows } from "./_persistDiscoveryShows.js";
 
 const CORS_HEADERS = {
@@ -372,7 +373,7 @@ function mergePremieres(items) {
     .slice(0, MAX_SHOWS);
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   if (event?.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -436,3 +437,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":900,"stale":300,"query":[]});

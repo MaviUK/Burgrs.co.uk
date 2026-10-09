@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 function jsonResponse(statusCode, body) {
   return {
     statusCode,
@@ -60,7 +61,7 @@ function dedupeEpisodes(episodes) {
   });
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const tmdbId = Number(event.queryStringParameters?.tmdbId);
 
@@ -161,3 +162,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":900,"stale":120,"query":["tmdbId"]});

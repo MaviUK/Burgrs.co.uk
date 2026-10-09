@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 import { handler as legacyStudioSearch } from "./studioSearchShows.js";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -217,7 +218,7 @@ async function searchTmdbCatalogue(query, page, region) {
   };
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
   }
@@ -272,3 +273,5 @@ export async function handler(event) {
     }
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["q","query","region","page"]});

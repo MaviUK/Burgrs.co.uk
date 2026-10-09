@@ -1,4 +1,5 @@
-export async function handler(event) {
+import { withPublicCache } from "./_publicDataCache.js";
+async function handleRequest(event) {
   try {
     const tmdbId = event.queryStringParameters?.tmdbId;
     const country = event.queryStringParameters?.country || "GB";
@@ -37,3 +38,5 @@ export async function handler(event) {
     };
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":1800,"stale":300,"query":["tmdbId","country"]});

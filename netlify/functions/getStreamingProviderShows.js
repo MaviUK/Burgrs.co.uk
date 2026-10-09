@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 import { persistDiscoveryShows } from "./_persistDiscoveryShows.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -96,7 +97,7 @@ async function enrichShow(show) {
   };
 }
 
-export default async (request) => {
+const handleRequest = async (request) => {
   if (request.method !== "GET") {
     return json({ error: "Method not allowed" }, 405);
   }
@@ -214,3 +215,5 @@ export default async (request) => {
     );
   }
 };
+
+export default withPublicCache(handleRequest, {"ttl":900,"stale":300,"query":["providerId","providerName","page","sort","genre"]});

@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 async function fetchTmdbIdFromTvdbId(tvdbId) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey || !tvdbId) return null;
@@ -206,7 +207,7 @@ function collectTaxonomyValues(series, targetLabels) {
   return uniqueText(buckets);
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const tvdbId = event.queryStringParameters?.tvdb_id;
 
@@ -357,3 +358,5 @@ export async function handler(event) {
     };
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":1800,"stale":300,"query":["tvdb_id"]});

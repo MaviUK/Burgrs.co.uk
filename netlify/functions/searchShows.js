@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 function normalizeNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
@@ -853,7 +854,7 @@ function scoreShow(show, options) {
   return score;
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   try {
     const query = event.queryStringParameters?.q?.trim() || "";
     const genre = event.queryStringParameters?.genre?.trim() || "";
@@ -1117,3 +1118,5 @@ export async function handler(event) {
     };
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["q","genre","network","relationshipType","setting","sourceShowId","sourceYear","sourceRating","sourceLanguage"]});

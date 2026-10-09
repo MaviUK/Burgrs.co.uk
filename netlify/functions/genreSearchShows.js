@@ -1,3 +1,4 @@
+import { withPublicCache } from "./_publicDataCache.js";
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p";
 const MAX_TMDB_PAGE = 500;
@@ -117,7 +118,7 @@ function normalizeResult(item, label, genreMap) {
   };
 }
 
-export async function handler(event) {
+async function handleRequest(event) {
   if (event.httpMethod && event.httpMethod !== "GET") {
     return response(405, { message: "Method not allowed" });
   }
@@ -194,3 +195,5 @@ export async function handler(event) {
     });
   }
 }
+
+export const handler = withPublicCache(handleRequest, {"ttl":300,"stale":60,"query":["q","page"]});
