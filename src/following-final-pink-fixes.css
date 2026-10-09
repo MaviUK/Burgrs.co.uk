@@ -121,3 +121,33 @@
   -webkit-text-fill-color: #f3b4cf !important;
   background: rgba(151, 7, 71, 0.14) !important;
 }
+
+/* The review footer renders proxy buttons for the hidden header actions. */
+.following-page .following-review-actions-row .following-review-share-proxy,
+.following-page .following-review-actions-row .following-review-comments-proxy {
+  background: var(--burgrs-menu-pink, #970747) !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  padding: 5px 10px !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+}
+
+.following-page .following-review-actions-row .following-review-share-proxy:hover,
+.following-page .following-review-actions-row .following-review-share-proxy:focus-visible,
+.following-page .following-review-actions-row .following-review-comments-proxy:hover,
+.following-page .following-review-actions-row .following-review-comments-proxy:focus-visible,
+.following-page .following-review-actions-row .following-review-comments-proxy.is-open {
+  background: var(--burgrs-menu-pink-hover, #7f063c) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.following-page .following-review-actions-row .following-review-share-proxy:focus-visible,
+.following-page .following-review-actions-row .following-review-comments-proxy:focus-visible {
+  outline: 2px solid #ffffff !important;
+  outline-offset: 3px;
+}
