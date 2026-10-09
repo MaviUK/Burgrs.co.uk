@@ -25,6 +25,9 @@ Capacitor is configured for the BURGRS Android app with the application ID `com.
 
 After later website changes, run `npm run cap:sync` to rebuild and copy the latest web files into the Android project.
 
+## Performance checks
+For a small public performance baseline, see [load testing](scripts/LOAD_TESTING.md).
+
 ## Features planned
 - Search shows
 - Airing today

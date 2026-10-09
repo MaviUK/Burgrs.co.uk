@@ -11,3 +11,8 @@ android/build/
 android/app/build/
 *.jks
 *.keystore
+
+# Generated load-test runs (curated baselines are stored under performance/).
+load-test-results/
+__pycache__/
+*.pyc
