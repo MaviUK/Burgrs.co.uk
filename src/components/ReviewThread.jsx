@@ -7,6 +7,8 @@ import ReviewVotes from "./ReviewVotes";
 import CreatorPostBody from "./CreatorPostBody";
 import "./ReviewThreadExtras.css";
 
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
+
 function formatDateTime(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -36,7 +38,11 @@ function buildTree(rows) {
     if (parentId && byId.has(parentId)) byId.get(parentId).replies.push(row);
     else roots.push(row);
   });
-  return roots;
+  // Pin only main reviews; replies stay attached to their original thread.
+  return roots.sort((a, b) =>
+    Number(String(b.user_id) === BURGRS_TV_PROFILE_ID) -
+    Number(String(a.user_id) === BURGRS_TV_PROFILE_ID)
+  );
 }
 
 function countAllReplies(review) {
@@ -132,7 +138,10 @@ function ReviewItem({
   }
 
   return (
-    <article className={`msd-review-item ${depth > 0 ? "is-reply" : ""}`}>
+    <article
+      className={`msd-review-item ${depth > 0 ? "is-reply" : ""}`}
+      data-review-pinned={depth === 0 && String(review.user_id) === BURGRS_TV_PROFILE_ID ? "true" : undefined}
+    >
       <div className="msd-review-body-wrap">
         <div className="msd-review-card">
           <div className="msd-review-head">

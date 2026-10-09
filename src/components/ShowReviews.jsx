@@ -39,6 +39,7 @@ function getReviewValues(reviewElement) {
   const date = Date.parse(dateText);
 
   return {
+    pinned: reviewElement.dataset.reviewPinned === "true",
     rating: Number.isFinite(rating) ? rating : null,
     date: Number.isFinite(date) ? date : 0,
   };
@@ -59,6 +60,7 @@ function applyReviewSort(container, sortOrder) {
       ...getReviewValues(element),
     }))
     .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       if (sortOrder === "oldest") return a.date - b.date || a.originalIndex - b.originalIndex;
       if (sortOrder === "rating-high") {
         if (a.rating === null && b.rating === null) return b.date - a.date;
