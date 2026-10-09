@@ -711,6 +711,7 @@ export default function FollowingFeed() {
             `)
             .in("user_id", followingIds)
             .eq("visibility", "public")
+            .eq("is_auto_season_review", false)
             .order("created_at", { ascending: false })
             .limit(40),
           { data: [], error: null },
@@ -721,10 +722,9 @@ export default function FollowingFeed() {
         withTimeout(
           supabase
             .from("show_reviews")
-            .select("id, user_id, show_id, body, created_at")
+            .select("id, user_id, show_id, body, created_at, creator_post_id, creator_post:creator_post_id(image_url)")
             .in("user_id", followingIds)
             .is("parent_id", null)
-            .is("creator_post_id", null)
             .order("created_at", { ascending: false })
             .limit(40),
           { data: [], error: null },
@@ -1075,7 +1075,7 @@ export default function FollowingFeed() {
 
             const review = item.data;
             const show = review.shows;
-            const ratingLabel = formatRating(review.user_rating);
+            const ratingLabel = review.creator_post_id ? "" : formatRating(review.user_rating);
             const commentKey = `review-${review.id}`;
 
             return (
@@ -1097,6 +1097,11 @@ export default function FollowingFeed() {
                     {show?.first_aired ? <span>{String(show.first_aired).slice(0, 4)}</span> : null}
                   </div>
                 </Link>
+                {review.creator_post?.image_url ? (
+                  <Link to={showHref(show)}>
+                    <img src={review.creator_post.image_url} alt="" className="following-post-image" />
+                  </Link>
+                ) : null}
                 <p className="following-review-text">{review.body}</p>
                 <FeedComments
                   inline

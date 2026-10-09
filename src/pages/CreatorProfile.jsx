@@ -1365,6 +1365,7 @@ export default function CreatorProfile() {
           updated_at
         `)
         .eq("user_id", profileRow.id)
+        .eq("is_auto_season_review", false)
         .order("created_at", { ascending: false })
         .limit(40);
 
@@ -1378,6 +1379,8 @@ export default function CreatorProfile() {
           show_id,
           body,
           created_at,
+          creator_post_id,
+          creator_post:creator_post_id(image_url),
           shows:show_id (
             id,
             name,
@@ -1389,7 +1392,6 @@ export default function CreatorProfile() {
         `)
         .eq("user_id", profileRow.id)
         .is("parent_id", null)
-        .is("creator_post_id", null)
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -2375,12 +2377,17 @@ export default function CreatorProfile() {
                       <div>
                         <strong>{review.shows?.name || "Show review"}</strong>
                         <span>
-                          {[formatDate(review.created_at), formatRating(review.user_rating)]
+                          {[formatDate(review.created_at), review.creator_post_id ? "" : formatRating(review.user_rating)]
                             .filter(Boolean)
                             .join(" • ")}
                         </span>
                       </div>
                     </Link>
+                    {review.creator_post?.image_url ? (
+                      <Link to={showHref(review.shows)}>
+                        <img src={review.creator_post.image_url} alt="" className="creator-post-image" />
+                      </Link>
+                    ) : null}
                     <p>{review.body}</p>
                   </article>
                 ))}
