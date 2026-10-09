@@ -64,7 +64,7 @@ select id from public.profiles where is_system_admin and username='Burgrs TV' li
 -- Treat midnight timestamps as date-only placeholders; use end of broadcast day.
 create function public.season_review_candidates()
 returns table(season_id uuid,show_id uuid,season_number integer,release_mode text,finale_at timestamptz,eligible_at timestamptz)
-language sql stable set search_path='' as $
+language sql stable set search_path='' as $$
  -- Bound settings to one row and filter recent finales before aggregating seasons.
  with settings as materialized (
  select author_id,initialized_at,weekly_delay_hours,binge_delay_hours
@@ -101,7 +101,7 @@ language sql stable set search_path='' as $
  ) select distinct c.season_id,c.show_id,c.season_number,c.release_mode,c.finale_at,
    c.finale_at+make_interval(hours=>case when c.release_mode='binge' then c.binge_delay_hours else c.weekly_delay_hours end)
  from candidates c;
-$;
+$$;
 create function public.season_review_enqueue() returns integer language plpgsql set search_path='' as $$
 declare n integer;
 begin
