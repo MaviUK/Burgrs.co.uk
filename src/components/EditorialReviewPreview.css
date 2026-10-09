@@ -1,0 +1,16 @@
+.editorial-review-preview { display:grid; gap:12px; min-width:0; }
+.editorial-review-cover { position:relative; display:block; height:clamp(150px,43vw,210px); overflow:hidden; isolation:isolate; border-radius:14px; background:#1a2638; color:#fff; text-decoration:none; }
+.editorial-review-cover > img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 40%; }
+.editorial-review-cover::after { content:""; position:absolute; inset:0; z-index:0; background:linear-gradient(180deg,transparent 15%,rgba(5,10,21,.25) 40%,rgba(5,10,21,.94)); }
+.editorial-review-show { position:absolute; left:16px; right:16px; bottom:14px; z-index:1; }
+.editorial-review-show > strong { display:block; font-size:24px; font-weight:850; letter-spacing:-.025em; line-height:1.15; }
+.editorial-review-show > span { display:block; margin-top:5px; color:#e2e8f0; font-size:12px; font-weight:650; line-height:1.4; }
+.editorial-review-cover-plain { height:76px; }
+.editorial-review-preview .editorial-review-headline { margin:0; color:#f8fafc; font-size:20px; font-weight:800; line-height:1.25; letter-spacing:-.025em; overflow-wrap:anywhere; }
+.editorial-review-preview .editorial-review-summary { margin:0; color:#d3dce9; font-size:15px; line-height:1.55; }
+.editorial-review-details[hidden] { display:none; }
+.editorial-review-details { display:grid; gap:12px; }
+.editorial-review-preview .editorial-review-details > p { margin:0; color:#d3dce9; font-size:15px; line-height:1.6; }
+.editorial-review-preview .editorial-review-toggle { display:inline-flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:44px; padding:10px 0 0; border:0; border-top:1px solid rgba(148,163,184,.16); border-radius:0; background:transparent; color:#f3b8d2; font:inherit; font-size:13px; font-weight:750; text-align:left; cursor:pointer; }
+.editorial-review-toggle > span { font-size:19px; font-weight:500; }
+.editorial-review-cover:focus-visible,.editorial-review-toggle:focus-visible { outline:2px solid #f3b8d2; outline-offset:4px; }

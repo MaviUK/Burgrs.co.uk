@@ -1,3 +1,4 @@
+import EditorialReviewPreview from "../components/EditorialReviewPreview";
 import CreatorPostBody from "../components/CreatorPostBody";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -1380,7 +1381,7 @@ export default function CreatorProfile() {
           body,
           created_at,
           creator_post_id,
-          creator_post:creator_post_id(image_url),
+          creator_post:creator_post_id(image_url, title),
           shows:show_id (
             id,
             name,
@@ -2368,6 +2369,10 @@ export default function CreatorProfile() {
               <div className="creator-feed-list">
                 {reviews.map((review) => (
                   <article key={review.id} className="creator-review-card">
+                    {review.creator_post_id ? (
+                      <EditorialReviewPreview review={review} show={review.shows} href={showHref(review.shows)} />
+                    ) : (
+                      <>
                     <Link to={showHref(review.shows)} className="creator-review-show">
                       {review.shows?.poster_url ? (
                         <img src={review.shows.poster_url} alt="" />
@@ -2383,12 +2388,9 @@ export default function CreatorProfile() {
                         </span>
                       </div>
                     </Link>
-                    {review.creator_post?.image_url ? (
-                      <Link to={showHref(review.shows)}>
-                        <img src={review.creator_post.image_url} alt="" className="creator-post-image" />
-                      </Link>
-                    ) : null}
                     <p>{review.body}</p>
+                      </>
+                    )}
                   </article>
                 ))}
               </div>

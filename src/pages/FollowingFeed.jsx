@@ -1,3 +1,4 @@
+import EditorialReviewPreview from "../components/EditorialReviewPreview";
 import CreatorPostBody from "../components/CreatorPostBody";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -722,7 +723,7 @@ export default function FollowingFeed() {
         withTimeout(
           supabase
             .from("show_reviews")
-            .select("id, user_id, show_id, body, created_at, creator_post_id, creator_post:creator_post_id(image_url)")
+            .select("id, user_id, show_id, body, created_at, creator_post_id, creator_post:creator_post_id(image_url, title)")
             .in("user_id", followingIds)
             .is("parent_id", null)
             .order("created_at", { ascending: false })
@@ -1087,6 +1088,10 @@ export default function FollowingFeed() {
                   activityLabel="Review"
                   comments={renderCommentButton(commentKey, "review")}
                 />
+                {review.creator_post_id ? (
+                  <EditorialReviewPreview review={review} show={show} href={showHref(show)} />
+                ) : (
+                  <>
                 <Link to={showHref(show)} className="following-show-card">
                   {show?.poster_url ? <img src={show.poster_url} alt="" /> : <div className="following-poster-fallback">?</div>}
                   <div>
@@ -1097,12 +1102,9 @@ export default function FollowingFeed() {
                     {show?.first_aired ? <span>{String(show.first_aired).slice(0, 4)}</span> : null}
                   </div>
                 </Link>
-                {review.creator_post?.image_url ? (
-                  <Link to={showHref(show)}>
-                    <img src={review.creator_post.image_url} alt="" className="following-post-image" />
-                  </Link>
-                ) : null}
                 <p className="following-review-text">{review.body}</p>
+                  </>
+                )}
                 <FeedComments
                   inline
                   hideToggle
