@@ -6,7 +6,7 @@ create table public.tv_season_review_settings (
   enabled boolean not null default false,
   initialized_at timestamptz not null default now(),
   weekly_delay_hours integer not null default 24 check (weekly_delay_hours = 24),
-  binge_delay_hours integer not null default 168 check (binge_delay_hours = 168),
+  binge_delay_hours integer not null default 24 check (binge_delay_hours = 24),
   max_posts_per_day integer not null default 6 check (max_posts_per_day between 1 and 20),
   last_error text,
   last_run_at timestamptz
