@@ -180,10 +180,10 @@ async function createActivityShareImageFile(card, payload, type) {
   const textW = isReview ? 570 : 420;
   const creator = getText(card, ".following-creator-name-link strong") || getText(document, ".creator-page .creator-hero-content h1") || "Mavi";
   const heading = type === "review"
-    ? getText(card, ".following-show-card strong") || getText(card, ".creator-review-show strong") || "Show review"
+    ? getText(card, ".editorial-review-show strong") || getText(card, ".following-show-card strong") || getText(card, ".creator-review-show strong") || "Show review"
     : getText(card, ".creator-list-cover-content h3") || "TV list";
   const subtitle = type === "review"
-    ? getText(card, ".following-review-text") || getText(card, "p") || "Shared a review on BURGRS."
+    ? getText(card, ".editorial-review-summary-text") || getText(card, ".following-review-text") || getText(card, "p") || "Shared a review on BURGRS."
     : getText(card, ".creator-list-cover-content p") || "Shared a TV list on BURGRS.";
 
   ctx.textAlign = "left";
@@ -281,9 +281,9 @@ function addShareButton(container, options, type) {
 function addCreatorReviewShares() {
   document.querySelectorAll(".creator-page .creator-review-card").forEach((card) => {
     addShareButton(card, () => {
-      const showName = getText(card, ".creator-review-show strong") || "this show";
-      const reviewText = getText(card, "p");
-      const showHref = getHref(card, ".creator-review-show") || window.location.pathname;
+      const showName = getText(card, ".editorial-review-show strong") || getText(card, ".creator-review-show strong") || "this show";
+      const reviewText = getText(card, ".editorial-review-summary-text") || getText(card, "p");
+      const showHref = getHref(card, ".editorial-review-cover") || getHref(card, ".creator-review-show") || window.location.pathname;
       const creatorName = getText(document, ".creator-page .creator-hero-content h1") || "Someone";
 
       return {
@@ -321,9 +321,9 @@ function addFollowingReviewShares() {
 
     addShareButton(card, () => {
       const creatorName = getText(card, ".following-creator-name-link strong") || "Someone";
-      const showName = getText(card, ".following-show-card strong") || "this show";
-      const reviewText = getText(card, ".following-review-text");
-      const showHref = getHref(card, ".following-show-card") || window.location.pathname;
+      const showName = getText(card, ".editorial-review-show strong") || getText(card, ".following-show-card strong") || "this show";
+      const reviewText = getText(card, ".editorial-review-summary-text") || getText(card, ".following-review-text");
+      const showHref = getHref(card, ".editorial-review-cover") || getHref(card, ".following-show-card") || window.location.pathname;
 
       return {
         title: `${creatorName}'s review of ${showName} on BURGRS`,

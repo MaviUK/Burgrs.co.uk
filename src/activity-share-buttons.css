@@ -125,3 +125,28 @@
   opacity: 1 !important;
   transform: translateX(-50%) translateY(0) !important;
 }
+
+/* Feed actions use the current navigation palette. */
+.following-card .burgrs-activity-share-btn,
+.creator-review-card .burgrs-activity-share-btn,
+.following-card .following-header-comment-button {
+  background: var(--burgrs-menu-pink, #970747) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  padding: 5px 10px !important;
+  box-shadow: none !important;
+}
+.following-card .following-header-comment-button span,
+.following-card .following-header-comment-button em {
+  color: inherit !important;
+}
+.following-card .burgrs-activity-share-btn:hover,
+.following-card .burgrs-activity-share-btn:focus-visible,
+.creator-review-card .burgrs-activity-share-btn:hover,
+.creator-review-card .burgrs-activity-share-btn:focus-visible,
+.following-card .following-header-comment-button:hover,
+.following-card .following-header-comment-button:focus-visible {
+  background: var(--burgrs-menu-pink-hover, #7f063c) !important;
+  color: #ffffff !important;
+}

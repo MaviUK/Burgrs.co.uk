@@ -11,6 +11,7 @@
 .editorial-review-details[hidden] { display:none; }
 .editorial-review-details { display:grid; gap:12px; }
 .editorial-review-preview .editorial-review-details > p { margin:0; color:#d3dce9; font-size:15px; line-height:1.6; }
-.editorial-review-preview .editorial-review-toggle { display:inline-flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:44px; padding:10px 0 0; border:0; border-top:1px solid rgba(148,163,184,.16); border-radius:0; background:transparent; color:#f3b8d2; font:inherit; font-size:13px; font-weight:750; text-align:left; cursor:pointer; }
-.editorial-review-toggle > span { font-size:19px; font-weight:500; }
+.editorial-review-preview .editorial-review-toggle { display:inline; width:auto; min-height:0; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#fff; font:inherit; font-weight:750; line-height:inherit; vertical-align:baseline; white-space:nowrap; cursor:pointer; }
 .editorial-review-cover:focus-visible,.editorial-review-toggle:focus-visible { outline:2px solid #f3b8d2; outline-offset:4px; }
+
+.editorial-review-preview .editorial-review-toggle:hover { color:#f3b8d2; text-decoration:underline; }
