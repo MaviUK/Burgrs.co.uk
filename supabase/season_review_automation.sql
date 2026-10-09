@@ -135,10 +135,11 @@ begin
  if not exists(select 1 from public.season_review_candidates() c where c.season_id=j.season_id and c.eligible_at<=now()) then raise exception 'Season schedule changed'; end if;
  if (select count(*) from public.tv_season_reviews where published_at>now()-interval '24 hours')>=cfg.max_posts_per_day then raise exception 'Daily review limit'; end if;
  if length(p_title)<10 or length(p_title)>180 or length(p_body)<300 or length(p_body)>8000
-   or position('AI-generated' in p_body)=0 then raise exception 'Invalid review format'; end if;
+   or p_body ~* '(AI[- ]generated|Sources:[[:space:]]|References:[[:space:]]|https?://)' or right(rtrim(p_body),1)='?'
+   then raise exception 'Invalid review format'; end if;
  select coalesce(nullif(backdrop_url,''),nullif(poster_url,'')) into picture from public.shows where id=j.show_id;
  insert into public.creator_posts(user_id,title,body,post_type,visibility,image_url,is_auto_news,is_auto_season_review,source_name,related_show_id)
- values(cfg.author_id,p_title,p_body,'post','public',picture,false,true,'Burgrs TV · AI-generated season review',j.show_id)
+ values(cfg.author_id,p_title,p_body,'post','public',picture,false,true,'Burgrs TV',j.show_id)
  returning id into post_id;
  update public.tv_season_reviews set status='published',creator_post_id=post_id,published_at=now(),updated_at=now(),lock_token=null,locked_until=null,last_error=null where id=j.id;
  return post_id;

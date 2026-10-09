@@ -7,7 +7,7 @@ export const researchSchema = object({
   completion_source_urls:strings,reason:str,
   facts:{type:'array',items:object({id:{type:'integer'},detail:str,source_urls:strings,contains_spoilers:bool})},
 });
-export const draftSchema = object({headline:str,verdict:str,paragraphs:{type:'array',items:object({text:str,evidence_ids:{type:'array',items:{type:'integer'}}})},question:str});
+export const draftSchema = object({headline:str,verdict:str,paragraphs:{type:'array',items:object({text:str,evidence_ids:{type:'array',items:{type:'integer'}}})}});
 export const verificationSchema = object({approved:bool,unsupported_claims:strings,contains_spoilers:bool,copied_phrasing:bool,reason:str});
 export function safeSource(value) {
   try {
@@ -56,26 +56,18 @@ export function validateDraft(draft,evidence) {
   if(!draft||clean(draft.headline).length<8||clean(draft.headline).length>70||clean(draft.verdict).length<20||clean(draft.verdict).length>180)throw new Error('Review headline or verdict invalid');
   if(!Array.isArray(draft.paragraphs)||draft.paragraphs.length!==2)throw new Error('Review paragraph count invalid');
   for(const p of draft.paragraphs)if(clean(p.text).length<60||!p.evidence_ids?.length||p.evidence_ids.some(id=>!allowed.has(id)))throw new Error('Review paragraph lacks spoiler-free evidence');
-  if(!clean(draft.question).endsWith('?')||clean(draft.question).length>220)throw new Error('Review needs a specific engagement question');
-  const whole=[draft.verdict,...draft.paragraphs.map(p=>p.text),draft.question].join(' ');
+  if (draft.question || clean(draft.paragraphs.at(-1).text).endsWith('?'))throw new Error('Review must end with a verdict, not an engagement question');
+  const whole=[draft.verdict,...draft.paragraphs.map(p=>p.text)].join(' ');
   const count=whole.split(/\s+/).filter(Boolean).length;
   if(count<90||count>140||/https?:\/\/|\[[^\]]*\]\(|\bI (watched|binged|saw)\b/i.test(whole))throw new Error('Review length or content invalid');
   if (/\[test\]|\btest post\b/i.test([draft.headline,whole].join(' ')))throw new Error('A published review cannot be labelled a test');
+  if (/\bAI[- ]generated\b|\bSources?:\s|\bReferences:\s/i.test(whole))throw new Error('Review must not contain public labels or references');
   return draft;
 }
-export function sourceLabel(value) {
-  const host=new URL(value).hostname.replace(/^www\./,'').replace(/^tollbit\./,'');
-  const names={'radiotimes.com':'Radio Times','thewrap.com':'TheWrap','theguardian.com':'The Guardian','primevideo.com':'Prime Video','aboutamazon.co.uk':'Amazon','aboutamazon.com':'Amazon','tvline.com':'TVLine','decider.com':'Decider','bbc.co.uk':'BBC'};
-  return names[host]||host;
-}
-export function renderReview(draft,evidence,showName,seasonNumber,showId='') {
+export function renderReview(draft,evidence,showName,seasonNumber) {
   validateDraft(draft,evidence);
-  const sources=[...new Set(draft.paragraphs.flatMap(p=>p.evidence_ids.flatMap(id=>evidence.facts.find(f=>f.id===id).source_urls)))];
-  // One footer instead of repeated long links after every paragraph.
-  if(sources.length>3)throw new Error('Review needs at most three public sources');
-  const footer='Sources: '+sources.map(url=>`[${sourceLabel(url)}](${url.replace('https://tollbit.radiotimes.com/','https://www.radiotimes.com/')})`).join(' · ');
   const title=`${showName} — Season ${seasonNumber}: ${clean(draft.headline)}`.slice(0,180);
-  const link=showId?`View show: [${showName.replace(/[\[\]]/g,'')}](https://burgrs.co.uk/show/${encodeURIComponent(showId)})`:'';
-  const body=[clean(draft.verdict),...draft.paragraphs.map(p=>clean(p.text)),clean(draft.question),footer,'AI-generated · Spoiler-free',link].filter(Boolean).join('\n\n');
+  // Evidence and generation metadata stay in the private audit, not the review.
+  const body=[clean(draft.verdict),...draft.paragraphs.map(p=>clean(p.text))].join('\n\n');
   return {title,body};
 }
