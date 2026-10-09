@@ -10,8 +10,10 @@ sharing new public creator posts from the Burgrs TV system profile. Existing pos
 are not backfilled. With multiple X channels, set `BUFFER_X_CHANNEL_ID` explicitly.
 Posts use Buffer's automatic queue and posting schedule. Configure that schedule in
 Buffer; its pause control is respected. Text is shortened to fit X and includes a
-Burgrs show/profile link and source attribution for news. This first version shares
-text and links; it does not upload images or videos.
+Burgrs show/profile link and source attribution for news. It attaches the post's
+image, or the related show's poster if no usable image is attached. Image URLs
+must be public HTTPS URLs. Accessible alt text accompanies the image. If neither
+image exists, it shares text and a link. Videos are not uploaded.
 
 Apply `supabase/buffer_x_publishing.sql` before deploying the function. Schedule it
 every 5 minutes using pg_cron/net.http_post and the existing Vault

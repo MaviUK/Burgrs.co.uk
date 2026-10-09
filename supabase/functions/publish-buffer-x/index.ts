@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { formatPost } from './format.mjs';
+import { imageAssets } from './artwork.mjs';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
 const CREATE = `mutation BurgrsPost($input: CreatePostInput!) {
@@ -89,9 +90,14 @@ Deno.serve(async (req: Request) => {
         current = null;
         continue;
       }
+      let artwork = imageAssets(post);
+      if (!artwork.length && post.related_show_id) {
+        const show = await checked(db.from('shows').select('name,poster_url').eq('id',post.related_show_id).maybeSingle());
+        artwork = imageAssets(post, show);
+      }
       const data = await buffer(CREATE, { input: {
         channelId: settings.channel_id, text: formatPost(post, profile.username),
-        schedulingType: 'automatic', mode: 'addToQueue', assets: [], needsApproval: false,
+        schedulingType: 'automatic', mode: 'addToQueue', assets: artwork, needsApproval: false,
         aiAssisted: Boolean(post.is_auto_news),
       } }, true);
       const result = data?.createPost;
