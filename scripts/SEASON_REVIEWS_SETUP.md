@@ -1,6 +1,7 @@
 # Burgrs TV automated season reviews
 
-Apply `supabase/season_review_automation.sql` once, deploy
+Apply `supabase/season_review_automation.sql`, then
+`supabase/season_reviews_show_tab.sql` once, and deploy
 `supabase/functions/publish-season-reviews/index.ts` with JWT verification disabled
 because it authenticates every request with the existing server-only Vault cron
 secret (`x-burgrs-cron-secret` via `validate_tv_news_cron_secret`). The settings,
@@ -51,7 +52,13 @@ a clear verdict and specific closing question. It does not fabricate personal
 viewing or numerical scores. The public post includes an AI-generated label,
 clickable numbered sources, show link, artwork and the standard comment/share
 controls. `is_auto_season_review=true`, `is_auto_news=false` keeps reviews out of
-news alerts. The existing Buffer queue forwards public posts and artwork; its
+news alerts. A database trigger also creates a linked, interactive `show_reviews`
+row, so each season review appears in the show's Reviews tab. Updates stay in
+sync and deletions follow the existing review-thread deletion behaviour. Existing
+published season reviews are backfilled. Only server roles can attach post links;
+ordinary members retain one main review per show. Profile and following feeds
+omit linked review rows because the original creator post already appears there.
+The existing Buffer queue forwards public posts and artwork; its
 worker marks these as AI-assisted. Six reviews per rolling 24 hours maximum.
 
 Publication and the queue's published state commit in one transaction. A unique

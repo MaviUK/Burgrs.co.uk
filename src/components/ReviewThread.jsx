@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { getProfileDisplayName, getProfileHref } from "../lib/profileLinks";
 import { getRootOwnerId, loadBlockedUserIds, usersAreBlocked } from "../lib/userBlocks";
 import ReviewVotes from "./ReviewVotes";
+import CreatorPostBody from "./CreatorPostBody";
 
 function formatDateTime(value) {
   if (!value) return "";
@@ -19,6 +20,7 @@ function formatDateTime(value) {
 }
 
 function formatRating(value) {
+  if (value === null || value === undefined || value === "") return "";
   const rating = Number(value);
   if (Number.isNaN(rating)) return "";
   return `${Math.round(rating)}%`;
@@ -227,7 +229,8 @@ function ReviewItem({
             </form>
           ) : (
             <>
-              <p
+              <CreatorPostBody
+                post={{ body: review.body, is_auto_season_review: Boolean(review.creator_post_id) }}
                 className="msd-review-text"
                 style={
                   hasLongText && !showFullText
@@ -239,9 +242,7 @@ function ReviewItem({
                       }
                     : undefined
                 }
-              >
-                {review.body}
-              </p>
+              />
               {hasLongText ? (
                 <button
                   type="button"
@@ -387,7 +388,7 @@ export default function ReviewThread({ config, itemId, currentUserId, heading, s
       const [reviewResult, blockedIds] = await Promise.all([
         supabase
           .from(config.reviewTable)
-          .select(`id, ${config.itemColumn}, user_id, parent_id, body, created_at, updated_at`)
+          .select(`id, ${config.itemColumn}, user_id, parent_id, body, created_at, updated_at${config.reviewTable === "show_reviews" ? ", creator_post_id" : ""}`)
           .eq(config.itemColumn, itemId)
           .order("created_at", { ascending: true }),
         loadBlockedUserIds(currentUserId),

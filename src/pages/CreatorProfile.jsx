@@ -1389,6 +1389,7 @@ export default function CreatorProfile() {
         `)
         .eq("user_id", profileRow.id)
         .is("parent_id", null)
+        .is("creator_post_id", null)
         .order("created_at", { ascending: false })
         .limit(20);
 

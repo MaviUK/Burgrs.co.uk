@@ -724,6 +724,7 @@ export default function FollowingFeed() {
             .select("id, user_id, show_id, body, created_at")
             .in("user_id", followingIds)
             .is("parent_id", null)
+            .is("creator_post_id", null)
             .order("created_at", { ascending: false })
             .limit(40),
           { data: [], error: null },
