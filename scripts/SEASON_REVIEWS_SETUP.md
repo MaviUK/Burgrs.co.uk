@@ -47,10 +47,15 @@ required. Unsupported, incomplete or spoiler-bearing drafts are held for daily
 research retries (at most eight); transient errors retry at most three times per
 stage. Monitor failed/held jobs and the settings `last_error`.
 
-The writing is original, blunt, witty British English with one strong argument,
-a clear verdict and specific closing question. It does not fabricate personal
+The writing is original, witty, sarcastic and blunt British English with one strong
+argument, a clear verdict and a short question that invites disagreement. Aim for
+110–130 words (hard limit 90–140), exactly two short paragraphs and a headline
+under 70 characters. Criticism follows the evidence; praise is equally pointed.
+Do not publish press-release filler, invented viewing, scores or test labels.
+Use at most three source URLs in one compact footer with publisher-name links.
+Keep the AI-generated disclosure at the end, below the review and question. It does not fabricate personal
 viewing or numerical scores. The public post includes an AI-generated label,
-clickable numbered sources, show link, artwork and the standard comment/share
+clickable publisher-name sources, show link, artwork and the standard comment/share
 controls. `is_auto_season_review=true`, `is_auto_news=false` keeps reviews out of
 news alerts. A database trigger also creates a linked, interactive `show_reviews`
 row, so each season review appears in the show's Reviews tab. Updates stay in
@@ -58,6 +63,9 @@ sync and deletions follow the existing review-thread deletion behaviour. Existin
 published season reviews are backfilled. Only server roles can attach post links;
 ordinary members retain one main review per show. Profile and following feeds
 omit linked review rows because the original creator post already appears there.
+Landscape show artwork is preferred, with the show's poster as fallback. The
+show's Reviews tab also displays the linked artwork and hides numerical ratings
+on generated editorial reviews. Ordinary member ratings remain unchanged.
 The existing Buffer queue forwards public posts and artwork; its
 worker marks these as AI-assisted. Six reviews per rolling 24 hours maximum.
 

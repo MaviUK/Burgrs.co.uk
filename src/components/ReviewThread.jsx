@@ -5,6 +5,7 @@ import { getProfileDisplayName, getProfileHref } from "../lib/profileLinks";
 import { getRootOwnerId, loadBlockedUserIds, usersAreBlocked } from "../lib/userBlocks";
 import ReviewVotes from "./ReviewVotes";
 import CreatorPostBody from "./CreatorPostBody";
+import "./ReviewThreadExtras.css";
 
 function formatDateTime(value) {
   if (!value) return "";
@@ -71,7 +72,7 @@ function ReviewItem({
   const avatarUrl = profile.avatar_url || "";
   const username = profile.username || "";
   const profileUrl = getProfileHref(profile, review.user_id);
-  const ratingLabel = formatRating(review.user_rating);
+  const ratingLabel = review.creator_post_id ? "" : formatRating(review.user_rating);
   const isOwnReview = currentUserId && String(review.user_id) === String(currentUserId);
   const canModerateReply = Boolean(
     depth > 0 &&
@@ -229,7 +230,17 @@ function ReviewItem({
             </form>
           ) : (
             <>
+              {review.creator_post?.image_url ? (
+                <img
+                  className="msd-season-review-artwork"
+                  src={review.creator_post.image_url}
+                  alt={`${review.creator_post.title?.split(" — ")[0] || "Show"} artwork`}
+                  loading="lazy"
+                  onError={(event) => { event.currentTarget.hidden = true; }}
+                />
+              ) : null}
               <CreatorPostBody
+                hideShowLink
                 post={{ body: review.body, is_auto_season_review: Boolean(review.creator_post_id) }}
                 className="msd-review-text"
                 style={
@@ -388,7 +399,7 @@ export default function ReviewThread({ config, itemId, currentUserId, heading, s
       const [reviewResult, blockedIds] = await Promise.all([
         supabase
           .from(config.reviewTable)
-          .select(`id, ${config.itemColumn}, user_id, parent_id, body, created_at, updated_at${config.reviewTable === "show_reviews" ? ", creator_post_id" : ""}`)
+          .select(`id, ${config.itemColumn}, user_id, parent_id, body, created_at, updated_at${config.reviewTable === "show_reviews" ? ", creator_post_id, creator_post:creator_post_id(image_url, title)" : ""}`)
           .eq(config.itemColumn, itemId)
           .order("created_at", { ascending: true }),
         loadBlockedUserIds(currentUserId),

@@ -11,3 +11,16 @@
 .msd-btn-danger:disabled {
   opacity: 0.58;
 }
+
+.msd-season-review-artwork {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 0 0 14px;
+}
+.msd-season-review-artwork[hidden] {
+  display: none;
+}
