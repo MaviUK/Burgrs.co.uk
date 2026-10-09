@@ -30,21 +30,23 @@ begin
  select count(*),min(id::text)::uuid into n,j from public.tv_season_reviews where season_id=se;
  if n<>1 then raise exception 'Duplicate enqueue'; end if;
  update public.tv_season_reviews set step='publish',verification='{"approved":true}'::jsonb where id=j;
+ -- Isolate the fixture lease from unrelated live jobs inside this rollback-only transaction.
+ update public.tv_season_reviews set next_attempt_at=now()+interval '1 day' where id<>j;
  perform public.season_review_claim(token);
  if not exists(select 1 from public.tv_season_reviews where id=j and status='processing' and lock_token=token) then raise exception 'Lease claim failed'; end if;
  if exists(select 1 from public.season_review_claim(gen_random_uuid()) where id=j) then raise exception 'Concurrent lease duplicated'; end if;
  begin
-   perform public.season_review_publish(j,gen_random_uuid(),'Transaction test review',repeat('AI-generated test body. ',30));
+   perform public.season_review_publish(j,gen_random_uuid(),'Transaction test review',repeat('A clear season review with a supported verdict. ',10));
    raise exception 'Wrong token accepted';
  exception when others then if sqlerrm='Wrong token accepted' then raise; end if; end;
  update public.tv_season_reviews set eligible_at=now()+interval '24 hours' where id=j;
  begin
-   perform public.season_review_publish(j,token,'Transaction test review',repeat('AI-generated test body. ',30));
+   perform public.season_review_publish(j,token,'Transaction test review',repeat('A clear season review with a supported verdict. ',10));
    raise exception 'Early publication accepted';
  exception when others then if sqlerrm='Early publication accepted' then raise; end if; end;
  update public.tv_season_reviews set eligible_at=now()-interval '1 hour' where id=j;
- p:=public.season_review_publish(j,token,'Transaction test review',repeat('AI-generated test body. ',30));
- again:=public.season_review_publish(j,token,'Duplicate transaction test',repeat('AI-generated duplicate. ',30));
+ p:=public.season_review_publish(j,token,'Transaction test review',repeat('A clear season review with a supported verdict. ',10));
+ again:=public.season_review_publish(j,token,'Duplicate transaction test',repeat('The same season review with a supported verdict. ',10));
  if p is null or again<>p then raise exception 'Publish not idempotent'; end if;
  if not exists(select 1 from public.creator_posts where id=p and is_auto_season_review and not is_auto_news and related_show_id=sh and visibility='public') then raise exception 'Review post metadata invalid'; end if;
  if not exists(select 1 from public.buffer_x_outbox where post_id=p) then raise exception 'Buffer integration failed'; end if;
