@@ -125,6 +125,15 @@ async function openReviewTarget(targetId) {
   if (target) highlightAndScroll(target);
 }
 
+async function openPublishedReviewTarget(targetId) {
+  if (!/^[0-9a-f-]{36}$/i.test(targetId)) return;
+  clickButtonByText(".msd-content-tab", "Reviews");
+  const target = await waitFor(() =>
+    document.querySelector(`.msd-reviews-section [data-review-id="${targetId}"]`)
+  );
+  if (target) highlightAndScroll(target);
+}
+
 async function openChatTarget(targetId) {
   clickButtonByText(".msd-bottom-action-btn", "Chatboard");
 
@@ -157,6 +166,7 @@ async function processNotificationDeepLink() {
   }
 
   try {
+    if (type === "new_review") await openPublishedReviewTarget(targetId);
     if (type === "review_reply") await openReviewTarget(targetId);
     if (type === "chat_reply") await openChatTarget(targetId);
   } finally {

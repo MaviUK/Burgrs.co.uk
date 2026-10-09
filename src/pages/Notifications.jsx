@@ -59,7 +59,7 @@ function buildShowRoute(show, item) {
     notificationTarget: item.entity_id,
   });
 
-  if (item.type === "review_reply") params.set("tab", "reviews");
+  if (["new_review", "review_reply"].includes(item.type)) params.set("tab", "reviews");
   if (item.type === "chat_reply") params.set("chat", "1");
 
   if (show?.tmdb_id) {
@@ -97,7 +97,7 @@ async function enrichNotificationRows(notificationRows) {
     new Set(notificationRows.map((item) => item.actor_user_id).filter(Boolean))
   );
   const reviewIds = notificationRows
-    .filter((item) => item.type === "review_reply" && item.entity_id)
+    .filter((item) => ["new_review", "review_reply"].includes(item.type) && item.entity_id)
     .map((item) => item.entity_id);
   const chatIds = notificationRows
     .filter((item) => item.type === "chat_reply" && item.entity_id)
@@ -412,7 +412,7 @@ export default function Notifications() {
   async function resolveNotificationDestination(item) {
     if (
       !item?.entity_id ||
-      !["review_reply", "chat_reply"].includes(item.type)
+      !["new_review", "review_reply", "chat_reply"].includes(item.type)
     ) {
       return item.url || "/notifications";
     }
@@ -574,6 +574,7 @@ export default function Notifications() {
               "season_premiere_date",
               "for_you_recommendation",
               "tv_news",
+              "new_review",
               "show_platform_change",
             ].includes(item.type);
             const thumbnailUrl = usesShowArtwork

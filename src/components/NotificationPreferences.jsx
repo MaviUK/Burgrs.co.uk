@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 
 const DEFAULTS = {
   follow: true,
+  new_review: true,
   review_reply: true,
   chat_reply: true,
   creator_post_comment: true,
@@ -33,6 +34,7 @@ const GROUPS = [
       ["new_season", "New season announced", "When BURGRS discovers a new season for a show in My Shows."],
       ["season_premiere_date", "Season premiere date", "When a first-air date is added for an upcoming season."],
       ["for_you_recommendations", "90%+ For You picks", "One daily alert when a new recommendation reaches 90% or higher."],
+      ["new_review", "Reviews for My Shows", "When someone publishes a review of a show in My Shows."],
       ["tv_news", "TV news for My Shows", "When BURGRS publishes a news story about a show in My Shows."],
       ["show_platform_changes", "Studio / streaming changes", "When a show in My Shows changes network or streaming availability."],
     ],
@@ -70,7 +72,7 @@ export default function NotificationPreferences({ sectionStyle }) {
 
         const { data, error: loadError } = await supabase
           .from("notification_preferences")
-          .select("follow, review_reply, chat_reply, creator_post_comment, creator_list_comment, airing_today, new_season, season_premiere_date, for_you_recommendations, tv_news, show_platform_changes")
+          .select("follow, new_review, review_reply, chat_reply, creator_post_comment, creator_list_comment, airing_today, new_season, season_premiere_date, for_you_recommendations, tv_news, show_platform_changes")
           .eq("user_id", user.id)
           .maybeSingle();
 

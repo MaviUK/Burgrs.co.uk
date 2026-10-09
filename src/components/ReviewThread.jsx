@@ -140,6 +140,7 @@ function ReviewItem({
   return (
     <article
       className={`msd-review-item ${depth > 0 ? "is-reply" : ""}`}
+      data-review-id={review.id}
       data-review-pinned={depth === 0 && String(review.user_id) === BURGRS_TV_PROFILE_ID ? "true" : undefined}
     >
       <div className="msd-review-body-wrap">
