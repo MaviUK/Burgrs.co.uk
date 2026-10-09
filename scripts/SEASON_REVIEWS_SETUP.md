@@ -21,6 +21,14 @@ Vault `tv_news_cron_secret` and a 120-second HTTP timeout. Normal body is `{}`.
 An authenticated `{"mode":"status"}` request reports readiness without generation.
 `{"mode":"preview","season_id":"..."}` researches an existing season without
 creating a post; inspect `tv_season_review_runs` for its evidence gate outcome.
+Research returns `preview_run_id`. Continue with the same season using
+`{"mode":"preview","stage":"draft","season_id":"...","preview_run_id":"..."}`,
+then `stage="verify"` with the returned draft run ID. Verification returns the
+checked, rendered review and an audit ID; preview stages never publish posts.
+Every stage requires the cron secret and checks the prior audit status and season.
+Source research verifies release completion in the show's original broadcast
+market so a US weekly rollout does not invalidate a confirmed UK binge release.
+Manual test publication is a separately authorised action after verification.
 
 Only seasons ending on/after activation day and tracked by the Burgrs TV profile
 are considered. No old-season backlog is published. Regular seasons wait 24
