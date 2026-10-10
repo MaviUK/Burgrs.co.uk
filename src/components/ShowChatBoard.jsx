@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { getProfileDisplayName, getProfileHref } from "../lib/profileLinks";
 import { getRootOwnerId, loadBlockedUserIds, usersAreBlocked } from "../lib/userBlocks";
 import ReviewVotes from "./ReviewVotes";
+import "./ShowChatBoard.css";
 
 function formatDateTime(value) {
   if (!value) return "";
@@ -37,6 +38,9 @@ function ChatItem({
   onReply,
   savingReplyId,
   onVoteChanged,
+  isPinned = false,
+  onTogglePin,
+  savingPinId,
   depth = 0,
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
@@ -74,7 +78,7 @@ function ChatItem({
   }
 
   return (
-    <article className={`msd-review-item ${depth > 0 ? "is-reply" : ""}`}>
+    <article className={`msd-review-item ${depth > 0 ? "is-reply" : "msd-chat-thread"} ${isPinned ? "is-pinned" : ""}`}>
       <div className="msd-review-body-wrap">
         <div className="msd-review-card msd-chat-card">
           <div className="msd-review-head">
@@ -95,6 +99,9 @@ function ChatItem({
             </div>
             <span className="msd-review-date">{formatDateTime(message.created_at)}</span>
           </div>
+          {depth === 0 && isPinned ? (
+            <div className="msd-chat-pin-marker"><span aria-hidden="true">📌</span> Pinned for you</div>
+          ) : null}
           <p className="msd-review-text">{message.body}</p>
         </div>
 
@@ -112,6 +119,19 @@ function ChatItem({
           {canReply ? (
             <button type="button" className="msd-review-action" onClick={() => setReplyOpen((prev) => !prev)}>
               Reply
+            </button>
+          ) : null}
+          {depth === 0 && currentUserId ? (
+            <button
+              type="button"
+              className={`msd-chat-pin-action ${isPinned ? "is-pinned" : ""}`}
+              onClick={() => onTogglePin(message.id)}
+              disabled={savingPinId === String(message.id)}
+              aria-pressed={isPinned}
+              aria-label={isPinned ? "Unpin this chat thread" : "Pin this chat thread"}
+            >
+              <span aria-hidden="true">📌</span>
+              {savingPinId === String(message.id) ? "Saving..." : isPinned ? "Unpin" : "Pin"}
             </button>
           ) : null}
         </div>
@@ -161,10 +181,14 @@ function ChatItem({
 export default function ShowChatBoard({ showId, currentUserId }) {
   const [messages, setMessages] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState(new Set());
+  const [followingUserIds, setFollowingUserIds] = useState(new Set());
+  const [pinnedThreadIds, setPinnedThreadIds] = useState(new Set());
+  const [chatFilter, setChatFilter] = useState("all");
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingReplyId, setSavingReplyId] = useState(null);
+  const [savingPinId, setSavingPinId] = useState(null);
   const [error, setError] = useState("");
 
   async function loadMessages() {
@@ -172,18 +196,23 @@ export default function ShowChatBoard({ showId, currentUserId }) {
     setLoading(true);
     setError("");
     try {
-      const [messageResult, blockedIds] = await Promise.all([
+      const [messageResult, blockedIds, followingResult] = await Promise.all([
         supabase
           .from("show_chat_messages")
           .select("id, show_id, user_id, parent_id, body, created_at, updated_at")
           .eq("show_id", showId)
           .order("created_at", { ascending: true }),
         loadBlockedUserIds(currentUserId),
+        currentUserId
+          ? supabase.from("user_follows").select("following_id").eq("follower_id", currentUserId)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (messageResult.error) throw messageResult.error;
+      if (followingResult.error) throw followingResult.error;
       const rows = messageResult.data || [];
       setBlockedUserIds(blockedIds);
+      setFollowingUserIds(new Set((followingResult.data || []).map((row) => String(row.following_id))));
 
       const userIds = Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean)));
       let profileMap = new Map();
@@ -217,6 +246,19 @@ export default function ShowChatBoard({ showId, currentUserId }) {
         });
       }
 
+      const rootIds = rows.filter((row) => !row.parent_id).map((row) => row.id);
+      let pinnedIds = new Set();
+      if (currentUserId && rootIds.length) {
+        const { data: pinRows, error: pinError } = await supabase
+          .from("chat_thread_pins")
+          .select("message_id")
+          .eq("user_id", currentUserId)
+          .in("message_id", rootIds);
+        if (pinError) throw pinError;
+        pinnedIds = new Set((pinRows || []).map((row) => String(row.message_id)));
+      }
+      setPinnedThreadIds(pinnedIds);
+
       setMessages(rows.map((row) => ({
         ...row,
         profile: profileMap.get(String(row.user_id)) || { id: row.user_id },
@@ -229,6 +271,8 @@ export default function ShowChatBoard({ showId, currentUserId }) {
       setError(err.message || "Failed loading chatboard");
       setMessages([]);
       setBlockedUserIds(new Set());
+      setFollowingUserIds(new Set());
+      setPinnedThreadIds(new Set());
     } finally {
       setLoading(false);
     }
@@ -258,6 +302,16 @@ export default function ShowChatBoard({ showId, currentUserId }) {
   }, [showId, currentUserId]);
 
   const messageTree = useMemo(() => buildTree(messages), [messages]);
+  const visibleMessageTree = useMemo(() => {
+    const matchingThreads = chatFilter === "following"
+      ? messageTree.filter((thread) => followingUserIds.has(String(thread.user_id)))
+      : messageTree;
+
+    // Keep the existing chronological order within each group.
+    return [...matchingThreads].sort((left, right) =>
+      Number(pinnedThreadIds.has(String(right.id))) - Number(pinnedThreadIds.has(String(left.id)))
+    );
+  }, [messageTree, chatFilter, followingUserIds, pinnedThreadIds]);
 
   async function postMessage(parentId, text) {
     const trimmed = text.trim();
@@ -302,6 +356,33 @@ export default function ShowChatBoard({ showId, currentUserId }) {
     if (ok) setBody("");
   }
 
+  async function toggleThreadPin(messageId) {
+    if (!currentUserId || !messageId || savingPinId) return;
+    const id = String(messageId);
+    const isPinned = pinnedThreadIds.has(id);
+    setSavingPinId(id);
+    setError("");
+    try {
+      const { error: pinError } = isPinned
+        ? await supabase.from("chat_thread_pins").delete()
+            .eq("user_id", currentUserId).eq("message_id", messageId)
+        : await supabase.from("chat_thread_pins")
+            .insert({ user_id: currentUserId, message_id: messageId });
+      if (pinError) throw pinError;
+      setPinnedThreadIds((previous) => {
+        const updated = new Set(previous);
+        if (isPinned) updated.delete(id);
+        else updated.add(id);
+        return updated;
+      });
+    } catch (pinError) {
+      console.error("Failed updating pinned thread:", pinError);
+      setError(pinError.message || "Could not update pinned thread.");
+    } finally {
+      setSavingPinId(null);
+    }
+  }
+
   return (
     <section className="msd-reviews-section msd-chatboard-section">
       {currentUserId ? (
@@ -326,11 +407,39 @@ export default function ShowChatBoard({ showId, currentUserId }) {
 
       {error ? <div className="msd-review-error">{error}</div> : null}
 
+      <div className="msd-chatboard-filters">
+        {currentUserId ? (
+          <div className="msd-chatboard-filter-buttons" role="group" aria-label="Filter chat threads">
+            <button
+              type="button"
+              className={`msd-chatboard-filter ${chatFilter === "all" ? "is-active" : ""}`}
+              onClick={() => setChatFilter("all")}
+              aria-pressed={chatFilter === "all"}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`msd-chatboard-filter ${chatFilter === "following" ? "is-active" : ""}`}
+              onClick={() => setChatFilter("following")}
+              aria-pressed={chatFilter === "following"}
+            >
+              Following
+            </button>
+          </div>
+        ) : null}
+        {!loading ? (
+          <span className="msd-chatboard-thread-count">
+            {visibleMessageTree.length} {visibleMessageTree.length === 1 ? "thread" : "threads"}
+          </span>
+        ) : null}
+      </div>
+
       {loading ? (
         <p className="msd-muted">Loading chatboard...</p>
-      ) : messageTree.length > 0 ? (
+      ) : visibleMessageTree.length > 0 ? (
         <div className="msd-review-list">
-          {messageTree.map((message) => (
+          {visibleMessageTree.map((message) => (
             <ChatItem
               key={message.id}
               message={message}
@@ -340,11 +449,14 @@ export default function ShowChatBoard({ showId, currentUserId }) {
               onReply={postMessage}
               savingReplyId={savingReplyId}
               onVoteChanged={loadMessages}
+              isPinned={pinnedThreadIds.has(String(message.id))}
+              onTogglePin={toggleThreadPin}
+              savingPinId={savingPinId}
             />
           ))}
         </div>
       ) : (
-        <p className="msd-muted">No chat messages yet. Start the conversation.</p>
+        <p className="msd-muted">{chatFilter === "following" ? "No threads started by people you follow yet." : "No chat messages yet. Start the conversation."}</p>
       )}
     </section>
   );
