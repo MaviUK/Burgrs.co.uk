@@ -1277,6 +1277,9 @@ export default function Dashboard() {
           forYou: (current.forYou || []).filter(
             (item) => String(item.show_id || item.id) !== showId
           ),
+          hiddenGems: (current.hiddenGems || []).filter(
+            (item) => String(item.show_id || item.id) !== showId
+          ),
           savedShows: savedShow
             ? [
                 ...(current.savedShows || []),
@@ -1319,6 +1322,7 @@ export default function Dashboard() {
 
     setSavingFeedbackId(showId);
     const previousForYou = dashboardView.forYou || [];
+    const previousHiddenGems = dashboardView.hiddenGems || [];
     const removeNow =
       feedbackType === "not_interested" || feedbackType === "less_like";
 
@@ -1326,6 +1330,9 @@ export default function Dashboard() {
       setDashboardView((current) => ({
         ...current,
         forYou: (current.forYou || []).filter(
+          (item) => String(item.show_id || item.id) !== showId
+        ),
+        hiddenGems: (current.hiddenGems || []).filter(
           (item) => String(item.show_id || item.id) !== showId
         ),
       }));
@@ -1354,11 +1361,15 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      const refreshed = await fetchForYouRecommendations();
+      const [refreshedForYou, refreshedHiddenGems] = await Promise.all([
+        fetchForYouRecommendations(),
+        fetchHiddenGems(),
+      ]);
       setDashboardView((current) => {
         const next = {
           ...current,
-          forYou: refreshed,
+          forYou: refreshedForYou,
+          hiddenGems: refreshedHiddenGems,
         };
         writeDashboardCache(user.id, next);
         return next;
@@ -1369,6 +1380,7 @@ export default function Dashboard() {
         setDashboardView((current) => ({
           ...current,
           forYou: previousForYou,
+          hiddenGems: previousHiddenGems,
         }));
       }
     } finally {
@@ -1566,6 +1578,19 @@ export default function Dashboard() {
   const friendPicks = dashboardView.friendPicks || [];
   const forYou = dashboardView.forYou || [];
   const hiddenGems = dashboardView.hiddenGems || [];
+  // Hide anything already suggested above or in My Shows, including cached
+  // duplicates. Keep filling the carousel from the larger discovery pool.
+  const excludedRecommendationIds = new Set(
+    [...forYou, ...savedShows]
+      .map((show) => String(show?.show_id || show?.id || ""))
+      .filter(Boolean)
+  );
+  const visibleHiddenGems = hiddenGems.filter((show) => {
+    const id = String(show?.show_id || show?.id || "");
+    if (!id || excludedRecommendationIds.has(id)) return false;
+    excludedRecommendationIds.add(id);
+    return true;
+  }).slice(0, 12);
   const data = dashboardView.stats || makeEmptyDashboardView().stats;
   const upNext = data.upNext || data.continueWatching?.[0] || null;
   const continueWatching = data.upNext
@@ -1695,14 +1720,14 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      {dashboardView.isSignedIn && hiddenGems.length > 0 ? (
+      {dashboardView.isSignedIn && visibleHiddenGems.length > 0 ? (
         <section className="dashboard-personal-section dashboard-hidden-gems-section">
           <SectionHeader title="Hidden Gems" />
           <p className="dashboard-for-you-subtitle">
             Highly rated, less obvious picks tuned to your taste.
           </p>
           <div className="for-you-row">
-            {hiddenGems.map((show) => (
+            {visibleHiddenGems.map((show) => (
               <ForYouCard
                 key={`hidden-gem-${show.show_id}`}
                 show={show}
