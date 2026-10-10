@@ -1277,3 +1277,53 @@
   opacity: 0.55;
   cursor: default;
 }
+
+
+/* Shared portrait poster sizing for every scrolling TV-show category on Home.
+   Keep compact Catch Up / episode list artwork and landscape news images separate. */
+.dashboard-page {
+  --home-poster-width: 112px;
+  --home-poster-height: 168px;
+}
+
+.dashboard-page :is(.recent-show-card, .trending-card, .friend-pick-card, .for-you-card) {
+  box-sizing: border-box;
+  flex: 0 0 var(--home-poster-width);
+  width: var(--home-poster-width);
+  min-width: var(--home-poster-width);
+  max-width: var(--home-poster-width);
+}
+
+.dashboard-page :is(.recent-show-poster, .trending-card-image, .friend-pick-poster, .for-you-poster) {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--home-poster-height);
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #111827;
+}
+
+.dashboard-page img:is(.recent-show-poster, .trending-card-image, .friend-pick-poster, .for-you-poster) {
+  display: block;
+}
+
+.dashboard-page .dashboard-poster-placeholder:is(.recent-show-poster, .trending-card-image, .friend-pick-poster, .for-you-poster) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 760px) {
+  .dashboard-page {
+    --home-poster-width: 126px;
+    --home-poster-height: 189px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-page {
+    --home-poster-width: 104px;
+    --home-poster-height: 156px;
+  }
+}
