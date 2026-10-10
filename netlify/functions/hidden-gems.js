@@ -83,7 +83,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           p_user_id: user.id,
-          p_limit: 12,
+          p_limit: 36,
         }),
       }
     );
