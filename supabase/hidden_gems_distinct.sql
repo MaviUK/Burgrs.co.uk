@@ -77,7 +77,7 @@ candidates as (
     case
       when s.tmdb_vote_count between 20 and 250 then 5
       when s.tmdb_vote_count between 251 and 750 then 4
-      when s.tmdb_vote_count between 751 and 2500 then 2
+      when s.tmdb_vote_count between 751 and 1800 then 2
       when coalesce(s.tmdb_vote_count, 0) = 0 and s.rating_average <= 3000 then 5
       when coalesce(s.tmdb_vote_count, 0) = 0 and s.rating_average <= 10000 then 3
       when coalesce(s.tmdb_vote_count, 0) = 0 then 1
@@ -104,8 +104,8 @@ candidates as (
     -- Both measures must indicate lower visibility when available.
     -- Without TMDB votes, use a conservative TVDB popularity cutoff.
     and (
-      (s.tmdb_vote_count between 20 and 2500
-        and s.rating_average between 1 and 75000)
+      (s.tmdb_vote_count between 20 and 1800
+        and s.rating_average between 1 and 35000)
       or (coalesce(s.tmdb_vote_count, 0) = 0
         and s.rating_average between 1 and 15000)
     )
