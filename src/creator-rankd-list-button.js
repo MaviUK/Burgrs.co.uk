@@ -3,6 +3,12 @@ import { supabase } from "./lib/supabase";
 const BUTTON_ATTR = "data-creator-rankd-list-button";
 const MODAL_ATTR = "data-creator-rankd-list-modal";
 const PAGE_SIZE = 500;
+const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
+
+function isBurgrsTvProfile(profile) {
+  return String(profile?.id || "") === BURGRS_TV_PROFILE_ID ||
+    String(profile?.username || "").trim().toLowerCase() === "burgrs tv";
+}
 
 let routeKey = "";
 let profileInfo = null;
@@ -34,7 +40,7 @@ function resetRoute(nextRouteKey) {
 async function resolveProfile(slug, expectedRouteKey) {
   let result = await supabase
     .from("profiles")
-    .select("id, username, display_name, full_name, avatar_url")
+    .select("id, username, display_name, full_name, avatar_url, is_system_admin")
     .eq("username", slug)
     .maybeSingle();
 
@@ -49,11 +55,13 @@ async function resolveProfile(slug, expectedRouteKey) {
   if (result.error) throw result.error;
   if (!result.data || routeKey !== expectedRouteKey) return;
 
+  const isSystem = isBurgrsTvProfile(result.data);
   const { count, error: countError } = await supabase
-    .from("user_show_rankings")
+    .from(isSystem ? "burgr_ratings" : "user_show_rankings")
     .select("show_id", { count: "exact", head: true })
-    .eq("user_id", result.data.id)
-    .not("ladder_position", "is", null);
+    .eq("user_id", result.data.id);
+
+  // Manual ladders are only relevant to ordinary accounts.
 
   if (countError) throw countError;
   if (routeKey !== expectedRouteKey) return;
@@ -71,19 +79,20 @@ function getProfileName() {
   );
 }
 
-async function fetchAllRankings(userId) {
+async function fetchAllRankings(userId, isSystem = false) {
   const rows = [];
   let from = 0;
 
   while (true) {
     const to = from + PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("user_show_rankings")
-      .select("show_id, ladder_position, wins, losses, comparisons")
-      .eq("user_id", userId)
-      .not("ladder_position", "is", null)
-      .order("ladder_position", { ascending: true })
-      .range(from, to);
+    let query = supabase
+      .from(isSystem ? "burgr_ratings" : "user_show_rankings")
+      .select(isSystem ? "show_id, rating" : "show_id, ladder_position, wins, losses, comparisons")
+      .eq("user_id", userId);
+    query = isSystem
+      ? query.order("rating", { ascending: false }).order("show_id", { ascending: true })
+      : query.not("ladder_position", "is", null).order("ladder_position", { ascending: true });
+    const { data, error } = await query.range(from, to);
 
     if (error) throw error;
 
@@ -93,6 +102,11 @@ async function fetchAllRankings(userId) {
     from += PAGE_SIZE;
   }
 
+  if (isSystem) {
+    // Rows are already ordered by rating in the database; tie-breaking by show
+    // name happens after the show details arrive.
+    return rows;
+  }
   return rows;
 }
 
@@ -170,14 +184,25 @@ function createLoadingModal() {
   return { modal, panel, subtitle };
 }
 
-function renderRankings(panel, subtitle, rankings, showMap) {
+function renderRankings(panel, subtitle, rankings, showMap, isSystem = false) {
   panel.querySelector(".creator-rankd-modal-loading")?.remove();
-  subtitle.textContent = `${rankings.length} ranked show${rankings.length === 1 ? "" : "s"}`;
+  subtitle.textContent = isSystem
+    ? `${rankings.length} shows • Highest rated first`
+    : `${rankings.length} ranked show${rankings.length === 1 ? "" : "s"}`; 
+  const ordered = isSystem
+    ? [...rankings].sort((a, b) =>
+        Number(b.rating) - Number(a.rating) ||
+        String(showMap.get(String(a.show_id))?.name || "").localeCompare(
+          String(showMap.get(String(b.show_id))?.name || ""), "en", { sensitivity: "base" }
+        ) ||
+        String(a.show_id).localeCompare(String(b.show_id))
+      )
+    : rankings;
 
   const list = document.createElement("div");
   list.className = "creator-rankd-full-list";
 
-  rankings.forEach((ranking, index) => {
+  ordered.forEach((ranking, index) => {
     const show = showMap.get(String(ranking.show_id));
     if (!show) return;
 
@@ -187,7 +212,7 @@ function renderRankings(panel, subtitle, rankings, showMap) {
 
     const rank = document.createElement("strong");
     rank.className = "creator-rankd-full-rank";
-    rank.textContent = String(ranking.ladder_position || index + 1);
+    rank.textContent = String(isSystem ? index + 1 : ranking.ladder_position || index + 1);
 
     if (show.poster_url) {
       const poster = document.createElement("img");
@@ -215,7 +240,7 @@ function renderRankings(panel, subtitle, rankings, showMap) {
     const comparisons = Number(ranking.comparisons || 0);
     meta.textContent = [
       year,
-      comparisons
+      isSystem ? `${Number(ranking.rating)}% rating` : comparisons
         ? `${comparisons} comparison${comparisons === 1 ? "" : "s"}`
         : "Rank'd",
     ]
@@ -246,12 +271,13 @@ async function openCreatorRankdList() {
   const { panel, subtitle } = createLoadingModal();
 
   loadingListPromise = (async () => {
-    const rankings = await fetchAllRankings(profileInfo.id);
+    const isSystem = isBurgrsTvProfile(profileInfo);
+    const rankings = await fetchAllRankings(profileInfo.id, isSystem);
     const showIds = rankings.map((row) => row.show_id).filter(Boolean);
     const showMap = await fetchShows(showIds);
 
     if (!document.body.contains(panel)) return;
-    renderRankings(panel, subtitle, rankings, showMap);
+    renderRankings(panel, subtitle, rankings, showMap, isSystem);
   })()
     .catch((error) => {
       console.warn("Failed loading creator full Rank'd list:", error);
