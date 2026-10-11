@@ -130,6 +130,7 @@ body.creator-rankd-modal-open {
 
 .creator-rankd-load-more {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 10px;
