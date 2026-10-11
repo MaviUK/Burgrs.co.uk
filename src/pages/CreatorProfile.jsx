@@ -589,6 +589,33 @@ export default function CreatorProfile() {
 
   async function loadRankedTopShows(profileRow) {
     try {
+      const isBurgrsTv =
+        profileRow?.is_system_admin === true &&
+        String(profileRow?.username || "").trim().toLowerCase() === "burgrs tv";
+
+      if (isBurgrsTv) {
+        // Use the same released-show ranking as Full Rank'd.
+        const { data, error } = await supabase.rpc("search_creator_rankd", {
+          p_user_id: profileRow.id,
+          p_is_system: true,
+          p_search: "",
+          p_offset: 0,
+          p_limit: 10,
+        });
+        if (error) throw error;
+        setRankedTopShows((data?.items || []).map((show) => ({
+          id: `ranked-${show.show_id}`,
+          show_id: show.show_id,
+          rank: Number(show.ladder_position),
+          show_name: show.name || "Untitled show",
+          show_year: getShowYear(show),
+          poster_url: show.poster_url || "",
+          tmdb_id: show.tmdb_id || "",
+          note: `${Number(show.rating)}% rating`,
+        })));
+        return;
+      }
+
       const { data: rankingRows, error: rankingError } = await supabase
         .from("user_show_rankings")
         .select("show_id, ladder_position, wins, losses, comparisons, updated_at")
@@ -597,11 +624,7 @@ export default function CreatorProfile() {
         .order("ladder_position", { ascending: true })
         .limit(10);
 
-      if (rankingError) {
-        console.warn("Creator automatic ranking list fetch error:", rankingError);
-        setRankedTopShows([]);
-        return;
-      }
+      if (rankingError) throw rankingError;
 
       const rows = rankingRows || [];
       const showIds = rows.map((row) => row.show_id).filter(Boolean);
@@ -614,35 +637,25 @@ export default function CreatorProfile() {
         .from("shows")
         .select("id, name, first_aired, poster_url, tmdb_id")
         .in("id", showIds);
-
-      if (showsError) {
-        console.warn("Creator automatic ranking list show fetch error:", showsError);
-        setRankedTopShows([]);
-        return;
-      }
+      if (showsError) throw showsError;
 
       const showMap = new Map((showRows || []).map((show) => [String(show.id), show]));
-      setRankedTopShows(
-        rows
-          .map((row, index) => {
-            const show = showMap.get(String(row.show_id));
-            if (!show) return null;
-
-            return {
-              id: `ranked-${row.show_id}`,
-              show_id: row.show_id,
-              rank: index + 1,
-              show_name: show.name || "Untitled show",
-              show_year: getShowYear(show),
-              poster_url: show.poster_url || "",
-              tmdb_id: show.tmdb_id || "",
-              note: row.comparisons
-                ? `${Number(row.comparisons || 0)} Rank'd comparison${Number(row.comparisons || 0) === 1 ? "" : "s"}`
-                : "From Rank'd",
-            };
-          })
-          .filter(Boolean)
-      );
+      setRankedTopShows(rows.map((row, index) => {
+        const show = showMap.get(String(row.show_id));
+        if (!show) return null;
+        return {
+          id: `ranked-${row.show_id}`,
+          show_id: row.show_id,
+          rank: index + 1,
+          show_name: show.name || "Untitled show",
+          show_year: getShowYear(show),
+          poster_url: show.poster_url || "",
+          tmdb_id: show.tmdb_id || "",
+          note: row.comparisons
+            ? `${Number(row.comparisons || 0)} Rank'd comparison${Number(row.comparisons || 0) === 1 ? "" : "s"}`
+            : "From Rank'd",
+        };
+      }).filter(Boolean));
     } catch (err) {
       console.warn("Failed loading automatic creator ranking list:", err);
       setRankedTopShows([]);
