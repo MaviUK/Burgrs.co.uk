@@ -240,11 +240,45 @@ function updateRankdSubtitle(state) {
 
 function updateRankdLoadStatus(state) {
   if (!state.firstPageLoaded || state.error) return;
+
   state.status.replaceChildren();
   state.status.classList.toggle("is-complete", !state.hasMore);
-  state.status.textContent = state.loading
-    ? "Loading more shows..."
-    : state.hasMore ? "Scroll to load more" : "All shows loaded";
+
+  if (state.loading) {
+    state.status.textContent = "Loading more shows...";
+  } else if (!state.hasMore) {
+    state.status.textContent = state.totalCount
+      ? "All shows loaded"
+      : state.search ? "No matching shows" : "No ranked shows";
+  } else {
+    // Infinite scroll is primary; the button is a fallback for Android
+    // WebViews where the scroll event / intersection callback can be missed.
+    const hint = document.createElement("span");
+    hint.textContent = "More shows load as you scroll";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Load next 20";
+    button.setAttribute("aria-label", "Load the next 20 shows");
+    button.addEventListener("click", () => {
+      void loadNextRankdPage(state);
+    });
+    state.status.append(hint, button);
+  }
+}
+
+function checkRankdScrollPosition(state) {
+  if (activeRankdModal !== state || !state.firstPageLoaded ||
+      state.loading || state.error || !state.hasMore) return;
+
+  const list = state.list;
+  const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
+  if (distanceFromBottom <= 260) {
+    void loadNextRankdPage(state);
+  }
+}
+
+function scheduleRankdScrollCheck(state) {
+  window.requestAnimationFrame(() => checkRankdScrollPosition(state));
 }
 
 function renderRankdPageError(state) {
@@ -303,6 +337,9 @@ async function loadNextRankdPage(state) {
     if (activeRankdModal === state && generation === state.generation) {
       state.loading = false;
       updateRankdLoadStatus(state);
+      // Also cover short lists, rotated phones, and a user already at the end
+      // when the previous request finished.
+      scheduleRankdScrollCheck(state);
     }
   }
 }
@@ -357,6 +394,7 @@ function openCreatorRankdList() {
       state.error = false;
       state.hasMore = true;
       state.list.replaceChildren(state.status);
+      state.list.scrollTop = 0;
       state.list.hidden = false;
       state.panel.querySelector(".creator-rankd-modal-loading")?.remove();
       state.panel.classList.add("is-loaded");
@@ -364,17 +402,27 @@ function openCreatorRankdList() {
       void loadNextRankdPage(state);
     }, 250);
   });
-  list.addEventListener("scroll", () => {
-    if (activeRankdModal !== state || !state.firstPageLoaded || state.loading || state.error || !state.hasMore) return;
-    const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
-    if (distanceFromBottom <= 180) void loadNextRankdPage(state);
-  }, { passive: true });
+  // Watch the footer itself rather than relying only on a scroll event.
+  // This works even when Android scroll gestures skip a scroll callback.
+  if (typeof window.IntersectionObserver === "function") {
+    const observer = new window.IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        checkRankdScrollPosition(state);
+      }
+    }, { root: list, rootMargin: "0px 0px 260px 0px", threshold: 0 });
+    observer.observe(status);
+    state.scrollObserver = observer;
+  }
+  list.addEventListener("scroll", () => checkRankdScrollPosition(state), { passive: true });
+  list.addEventListener("touchend", () => scheduleRankdScrollCheck(state), { passive: true });
 
   void loadNextRankdPage(state);
 }
 
 function closeRankdModal() {
+  const oldModal = activeRankdModal;
   activeRankdModal = null;
+  oldModal?.scrollObserver?.disconnect();
   document.querySelector(`[${MODAL_ATTR}]`)?.remove();
   document.body.classList.remove("creator-rankd-modal-open");
 }
