@@ -300,11 +300,13 @@ function renderRankdPageError(state) {
 async function loadNextRankdPage(state) {
   if (activeRankdModal !== state || state.loading || !state.hasMore || state.error) return;
 
+  // Keep the request generation in scope for catch/finally. Previously it
+  // lived inside try and threw in finally, leaving loading=true forever.
+  const generation = state.generation;
   state.loading = true;
   updateRankdLoadStatus(state);
 
   try {
-    const generation = state.generation;
     const { rows: rankings, total } = await fetchRankingsPage(state.userId, state.isSystem, state.offset, state.search);
     if (activeRankdModal !== state || generation !== state.generation) return;
     const showMap = new Map(rankings.map((row) => [String(row.show_id), row]));
