@@ -1188,36 +1188,13 @@
   text-decoration: none;
 }
 
-.for-you-dismiss {
-  width: 100%;
-  margin-top: 6px;
-  padding: 6px 7px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.035);
-  color: #94a3b8;
-  font-size: 9px;
-  font-weight: 850;
-  cursor: pointer;
-}
-
-.for-you-dismiss:hover,
-.for-you-dismiss:focus-visible {
-  border-color: rgba(249, 168, 212, 0.28);
-  background: rgba(249, 168, 212, 0.07);
-  color: #f9a8d4;
-  outline: none;
-}
-
-
 .for-you-actions {
   display: grid;
   gap: 5px;
   margin-top: 7px;
 }
 
-.for-you-add,
-.for-you-dismiss {
+.for-you-add {
   width: 100%;
   min-height: 30px;
   padding: 6px 7px;
@@ -1239,8 +1216,7 @@
   outline: none;
 }
 
-.for-you-add:disabled,
-.for-you-dismiss:disabled {
+.for-you-add:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -1248,16 +1224,17 @@
 
 .for-you-feedback-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .for-you-feedback {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 6px 5px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 3px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.035);
@@ -1267,8 +1244,8 @@
 
 .for-you-feedback-icon {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   pointer-events: none;
 }
 
