@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import App from './App'
 import ProfileIssueReportMount from './components/ProfileIssueReportMount'
 import NativePushPrompt from './components/NativePushPrompt'
@@ -106,6 +107,73 @@ function recoverFromStaleDeploy() {
   return true
 }
 
+// The Android WebView can keep an older, already-open HTML bundle in memory
+// after Netlify publishes an update. On returning to the app, compare the
+// hashed Vite entry assets with the newly served, uncached index.html and
+// refresh only if the deployed bundle has changed.
+function getPublishedBundleSignature(doc) {
+  const script = doc.querySelector('script[type="module"][src*="/assets/"]')?.getAttribute('src') || ''
+  const stylesheet = doc.querySelector('link[rel="stylesheet"][href*="/assets/"]')?.getAttribute('href') || ''
+  return script || stylesheet ? `${script}|${stylesheet}` : ''
+}
+
+function installNativeDeploymentRefresh() {
+  if (!Capacitor.isNativePlatform()) return
+
+  const loadedSignature = getPublishedBundleSignature(document)
+  if (!loadedSignature) return
+
+  let backgrounded = false
+  let checking = false
+  let lastCheckAt = 0
+
+  async function checkLatestDeployment() {
+    const now = Date.now()
+    if (checking || now - lastCheckAt < 30_000) return
+    checking = true
+    lastCheckAt = now
+
+    try {
+      const url = new URL('/index.html', window.location.origin)
+      url.searchParams.set('_burgrs_deploy_check', String(now))
+      const response = await window.fetch(url.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      })
+      if (!response.ok) return
+
+      const latestDoc = new DOMParser().parseFromString(await response.text(), 'text/html')
+      const latestSignature = getPublishedBundleSignature(latestDoc)
+      if (latestSignature && latestSignature !== loadedSignature) {
+        recoverFromStaleDeploy()
+      }
+    } catch (error) {
+      // Network interruptions must never block access to the existing app.
+      console.debug('Could not check latest BURGRS deployment:', error)
+    } finally {
+      checking = false
+    }
+  }
+
+  function onForeground() {
+    if (!backgrounded) return
+    backgrounded = false
+    void checkLatestDeployment()
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) backgrounded = true
+    else onForeground()
+  })
+  window.addEventListener('focus', onForeground)
+
+  const nativeApp = registerPlugin('App')
+  nativeApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) onForeground()
+    else backgrounded = true
+  }).catch((error) => console.debug('Could not listen for native app updates:', error))
+}
+
 // Vite emits this event when an already-open tab requests an asset from an
 // older deploy. Recover before React falls through to the generic error UI.
 window.addEventListener('vite:preloadError', (event) => {
@@ -122,6 +190,7 @@ installSingleSessionEnforcement(supabase)
 installRegionAwareStreaming()
 installShowCommunityPortal(supabase)
 installGlobalPageLoadingTheme()
+installNativeDeploymentRefresh()
 
 function loadDeferredEnhancements() {
   return Promise.allSettled([
