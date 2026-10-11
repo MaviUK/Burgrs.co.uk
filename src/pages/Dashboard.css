@@ -1279,11 +1279,12 @@
 }
 
 
-/* Shared portrait poster sizing for every scrolling TV-show category on Home.
-   Keep compact Catch Up / episode list artwork and landscape news images separate. */
+/* Use the same 2:3 poster size as the My Shows grid in all Home carousels.
+   Mobile My Shows has four columns with 10px gaps: 14px side padding up
+   to 640px, otherwise the page's standard 16px side padding to 768px.
+   Leave landscape news art and compact episode / Catch Up cards alone. */
 .dashboard-page {
   --home-poster-width: 112px;
-  --home-poster-height: 168px;
 }
 
 .dashboard-page :is(.recent-show-card, .trending-card, .friend-pick-card, .for-you-card) {
@@ -1297,7 +1298,7 @@
 .dashboard-page :is(.recent-show-poster, .trending-card-image, .friend-pick-poster, .for-you-poster) {
   box-sizing: border-box;
   width: 100%;
-  height: var(--home-poster-height);
+  height: auto;
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 14px;
@@ -1314,16 +1315,24 @@
   justify-content: center;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 769px) {
   .dashboard-page {
     --home-poster-width: 126px;
-    --home-poster-height: 189px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-page {
+    --home-poster-width: calc((100vw - 62px) / 4);
+  }
+
+  .dashboard-page :is(.recent-show-poster, .trending-card-image, .friend-pick-poster, .for-you-poster) {
+    border-radius: 10px;
   }
 }
 
 @media (max-width: 640px) {
   .dashboard-page {
-    --home-poster-width: 104px;
-    --home-poster-height: 156px;
+    --home-poster-width: calc((100vw - 58px) / 4);
   }
 }
