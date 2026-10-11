@@ -78,38 +78,16 @@ function getProfileName() {
   );
 }
 
-async function fetchRankingsPage(userId, isSystem, offset) {
-  let query = supabase
-    .from(isSystem ? "burgr_ratings" : "user_show_rankings")
-    .select(isSystem ? "show_id, rating" : "show_id, ladder_position, wins, losses, comparisons")
-    .eq("user_id", userId);
-
-  query = isSystem
-    ? query.order("rating", { ascending: false }).order("show_id", { ascending: true })
-    : query.not("ladder_position", "is", null)
-        .order("ladder_position", { ascending: true })
-        .order("show_id", { ascending: true });
-
-  const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
+async function fetchRankingsPage(userId, isSystem, offset, search = "") {
+  const { data, error } = await supabase.rpc("search_creator_rankd", {
+    p_user_id: userId,
+    p_is_system: isSystem,
+    p_search: search,
+    p_offset: offset,
+    p_limit: PAGE_SIZE,
+  });
   if (error) throw error;
-  return data || [];
-}
-
-async function fetchShows(showIds) {
-  const showMap = new Map();
-
-  for (let index = 0; index < showIds.length; index += 100) {
-    const batch = showIds.slice(index, index + 100);
-    const { data, error } = await supabase
-      .from("shows")
-      .select("id, name, first_aired, poster_url, tmdb_id, tvdb_id")
-      .in("id", batch);
-
-    if (error) throw error;
-    (data || []).forEach((show) => showMap.set(String(show.id), show));
-  }
-
-  return showMap;
+  return { rows: data?.items || [], total: Number(data?.total || 0) };
 }
 
 function showHref(show) {
@@ -153,6 +131,16 @@ function createLoadingModal() {
 
   head.append(titleWrap, closeButton);
 
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "creator-rankd-search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search their full Rank'd list...";
+  searchInput.setAttribute("aria-label", "Search this user's full Rank'd list");
+  searchInput.autocomplete = "off";
+  searchInput.maxLength = 100;
+  searchWrap.appendChild(searchInput);
+
   const loading = document.createElement("div");
   loading.className = "creator-rankd-modal-loading";
   loading.innerHTML = '<span aria-hidden="true">🍔</span><strong>Loading rankings...</strong>';
@@ -168,7 +156,7 @@ function createLoadingModal() {
   status.setAttribute("aria-live", "polite");
   list.appendChild(status);
 
-  panel.append(head, loading, list);
+  panel.append(head, searchWrap, loading, list);
   modal.appendChild(panel);
   document.body.appendChild(modal);
   document.body.classList.add("creator-rankd-modal-open");
@@ -177,7 +165,7 @@ function createLoadingModal() {
     if (event.target === modal) closeRankdModal();
   });
 
-  return { modal, panel, subtitle, list, status };
+  return { modal, panel, subtitle, list, status, searchInput };
 }
 
 function appendRankings(state, rankings, showMap) {
@@ -196,7 +184,7 @@ function appendRankings(state, rankings, showMap) {
     const rank = document.createElement("strong");
     rank.className = "creator-rankd-full-rank";
     rank.textContent = String(
-      state.isSystem ? state.offset + index + 1 : ranking.ladder_position || state.offset + index + 1
+      ranking.ladder_position || state.offset + index + 1
     );
 
     if (show.poster_url) {
@@ -244,9 +232,10 @@ function appendRankings(state, rankings, showMap) {
 function updateRankdSubtitle(state) {
   const total = Number(state.totalCount || 0).toLocaleString("en-GB");
   const shown = state.renderedCount.toLocaleString("en-GB");
-  state.subtitle.textContent =
-    `Showing ${shown} of ${total} ${state.isSystem ? "rated" : "ranked"} shows` +
-    (state.isSystem ? " • Highest rated first" : "");
+  state.subtitle.textContent = state.search
+    ? `${total} matching show${state.totalCount === 1 ? "" : "s"} • Showing ${shown}`
+    : `Showing ${shown} of ${total} ${state.isSystem ? "rated" : "ranked"} shows` +
+      (state.isSystem ? " • Highest rated first" : "");
 }
 
 function updateRankdLoadStatus(state) {
@@ -281,16 +270,18 @@ async function loadNextRankdPage(state) {
   updateRankdLoadStatus(state);
 
   try {
-    const rankings = await fetchRankingsPage(state.userId, state.isSystem, state.offset);
-    const showIds = rankings.map((row) => row.show_id).filter(Boolean);
-    const showMap = await fetchShows(showIds);
+    const generation = state.generation;
+    const { rows: rankings, total } = await fetchRankingsPage(state.userId, state.isSystem, state.offset, state.search);
+    if (activeRankdModal !== state || generation !== state.generation) return;
+    const showMap = new Map(rankings.map((row) => [String(row.show_id), row]));
 
     // An old request must never re-open or populate a modal that has been closed.
-    if (activeRankdModal !== state) return;
+    if (activeRankdModal !== state || generation !== state.generation) return;
 
+    state.totalCount = total;
     state.renderedCount += appendRankings(state, rankings, showMap);
     state.offset += rankings.length;
-    state.hasMore = rankings.length === PAGE_SIZE;
+    state.hasMore = state.offset < total;
 
     if (!state.firstPageLoaded) {
       state.panel.querySelector(".creator-rankd-modal-loading")?.remove();
@@ -301,7 +292,7 @@ async function loadNextRankdPage(state) {
     updateRankdSubtitle(state);
   } catch (error) {
     console.warn("Failed loading creator Rank'd page:", error);
-    if (activeRankdModal !== state) return;
+    if (activeRankdModal !== state || generation !== state.generation) return;
     state.error = true;
     if (state.firstPageLoaded) {
       renderRankdPageError(state);
@@ -309,7 +300,7 @@ async function loadNextRankdPage(state) {
       renderError(state.panel, state.subtitle, error?.message);
     }
   } finally {
-    if (activeRankdModal === state) {
+    if (activeRankdModal === state && generation === state.generation) {
       state.loading = false;
       updateRankdLoadStatus(state);
     }
@@ -329,7 +320,7 @@ function renderError(panel, subtitle, message) {
 function openCreatorRankdList() {
   if (!profileInfo?.id || activeRankdModal) return;
 
-  const { modal, panel, subtitle, list, status } = createLoadingModal();
+  const { modal, panel, subtitle, list, status, searchInput } = createLoadingModal();
   const state = {
     modal,
     panel,
@@ -345,9 +336,34 @@ function openCreatorRankdList() {
     hasMore: true,
     loading: false,
     error: false,
+    search: "",
+    generation: 0,
   };
 
   activeRankdModal = state;
+  let searchDebounce = null;
+  searchInput.addEventListener("input", () => {
+    window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(() => {
+      if (activeRankdModal !== state) return;
+      const term = searchInput.value.trim();
+      if (term === state.search) return;
+      state.search = term;
+      state.generation += 1;
+      state.offset = 0;
+      state.renderedCount = 0;
+      state.firstPageLoaded = true;
+      state.loading = false;
+      state.error = false;
+      state.hasMore = true;
+      state.list.replaceChildren(state.status);
+      state.list.hidden = false;
+      state.panel.querySelector(".creator-rankd-modal-loading")?.remove();
+      state.panel.classList.add("is-loaded");
+      state.status.textContent = "Searching shows...";
+      void loadNextRankdPage(state);
+    }, 250);
+  });
   list.addEventListener("scroll", () => {
     if (activeRankdModal !== state || !state.firstPageLoaded || state.loading || state.error || !state.hasMore) return;
     const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
