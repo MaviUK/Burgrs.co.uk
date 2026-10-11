@@ -20,16 +20,16 @@ body.creator-rankd-modal-open {
   inset: 0;
   z-index: 10000;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 18px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background: rgba(2, 6, 23, 0.82);
   backdrop-filter: blur(12px);
 }
 
 .creator-rankd-modal-panel {
   width: min(100%, 680px);
-  max-height: calc(100svh - 36px - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -39,7 +39,12 @@ body.creator-rankd-modal-open {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.54);
 }
 
+.creator-rankd-modal-panel.is-loaded {
+  height: min(82svh, 820px);
+}
+
 .creator-rankd-modal-head {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -91,9 +96,38 @@ body.creator-rankd-modal-open {
 }
 
 .creator-rankd-full-list {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 8px 12px 18px;
+}
+
+.creator-rankd-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.creator-rankd-load-more.is-complete {
+  opacity: 0.7;
+}
+
+.creator-rankd-load-more button {
+  border: 1px solid rgba(151, 7, 71, 0.45);
+  border-radius: 9px;
+  padding: 7px 12px;
+  background: rgba(151, 7, 71, 0.18);
+  color: #f8fafc;
+  cursor: pointer;
+  font: inherit;
 }
 
 .creator-rankd-full-row {
@@ -172,8 +206,8 @@ body.creator-rankd-modal-open {
   }
 }
 
-@media (min-width: 769px) {
-  .creator-rankd-modal {
-    align-items: center;
+@media (max-height: 500px) {
+  .creator-rankd-modal-panel.is-loaded {
+    height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
