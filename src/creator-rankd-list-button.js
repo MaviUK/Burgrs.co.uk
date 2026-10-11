@@ -2,7 +2,7 @@ import { supabase } from "./lib/supabase";
 
 const BUTTON_ATTR = "data-creator-rankd-list-button";
 const MODAL_ATTR = "data-creator-rankd-list-modal";
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 20;
 const BURGRS_TV_PROFILE_ID = "add17d5c-c8fd-4430-904f-271342100bf9";
 
 function isBurgrsTvProfile(profile) {
@@ -14,7 +14,7 @@ let routeKey = "";
 let profileInfo = null;
 let rankingCount = 0;
 let loadingProfilePromise = null;
-let loadingListPromise = null;
+let activeRankdModal = null;
 let syncQueued = false;
 
 function getProfileSlug() {
@@ -34,7 +34,6 @@ function resetRoute(nextRouteKey) {
   profileInfo = null;
   rankingCount = 0;
   loadingProfilePromise = null;
-  loadingListPromise = null;
 }
 
 async function resolveProfile(slug, expectedRouteKey) {
@@ -47,7 +46,7 @@ async function resolveProfile(slug, expectedRouteKey) {
   if (!result.data && !result.error && isUuid(slug)) {
     result = await supabase
       .from("profiles")
-      .select("id, username, display_name, full_name, avatar_url")
+      .select("id, username, display_name, full_name, avatar_url, is_system_admin")
       .eq("id", slug)
       .maybeSingle();
   }
@@ -56,12 +55,12 @@ async function resolveProfile(slug, expectedRouteKey) {
   if (!result.data || routeKey !== expectedRouteKey) return;
 
   const isSystem = isBurgrsTvProfile(result.data);
-  const { count, error: countError } = await supabase
+  let countQuery = supabase
     .from(isSystem ? "burgr_ratings" : "user_show_rankings")
     .select("show_id", { count: "exact", head: true })
     .eq("user_id", result.data.id);
-
-  // Manual ladders are only relevant to ordinary accounts.
+  if (!isSystem) countQuery = countQuery.not("ladder_position", "is", null);
+  const { count, error: countError } = await countQuery;
 
   if (countError) throw countError;
   if (routeKey !== expectedRouteKey) return;
@@ -79,35 +78,21 @@ function getProfileName() {
   );
 }
 
-async function fetchAllRankings(userId, isSystem = false) {
-  const rows = [];
-  let from = 0;
+async function fetchRankingsPage(userId, isSystem, offset) {
+  let query = supabase
+    .from(isSystem ? "burgr_ratings" : "user_show_rankings")
+    .select(isSystem ? "show_id, rating" : "show_id, ladder_position, wins, losses, comparisons")
+    .eq("user_id", userId);
 
-  while (true) {
-    const to = from + PAGE_SIZE - 1;
-    let query = supabase
-      .from(isSystem ? "burgr_ratings" : "user_show_rankings")
-      .select(isSystem ? "show_id, rating" : "show_id, ladder_position, wins, losses, comparisons")
-      .eq("user_id", userId);
-    query = isSystem
-      ? query.order("rating", { ascending: false }).order("show_id", { ascending: true })
-      : query.not("ladder_position", "is", null).order("ladder_position", { ascending: true });
-    const { data, error } = await query.range(from, to);
+  query = isSystem
+    ? query.order("rating", { ascending: false }).order("show_id", { ascending: true })
+    : query.not("ladder_position", "is", null)
+        .order("ladder_position", { ascending: true })
+        .order("show_id", { ascending: true });
 
-    if (error) throw error;
-
-    const page = data || [];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-
-  if (isSystem) {
-    // Rows are already ordered by rating in the database; tie-breaking by show
-    // name happens after the show details arrive.
-    return rows;
-  }
-  return rows;
+  const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
+  if (error) throw error;
+  return data || [];
 }
 
 async function fetchShows(showIds) {
@@ -172,7 +157,18 @@ function createLoadingModal() {
   loading.className = "creator-rankd-modal-loading";
   loading.innerHTML = '<span aria-hidden="true">🍔</span><strong>Loading rankings...</strong>';
 
-  panel.append(head, loading);
+  const list = document.createElement("div");
+  list.className = "creator-rankd-full-list";
+  list.setAttribute("aria-label", "Full Rank'd rankings");
+  list.hidden = true;
+
+  const status = document.createElement("div");
+  status.className = "creator-rankd-load-more";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  list.appendChild(status);
+
+  panel.append(head, loading, list);
   modal.appendChild(panel);
   document.body.appendChild(modal);
   document.body.classList.add("creator-rankd-modal-open");
@@ -181,30 +177,17 @@ function createLoadingModal() {
     if (event.target === modal) closeRankdModal();
   });
 
-  return { modal, panel, subtitle };
+  return { modal, panel, subtitle, list, status };
 }
 
-function renderRankings(panel, subtitle, rankings, showMap, isSystem = false) {
-  panel.querySelector(".creator-rankd-modal-loading")?.remove();
-  subtitle.textContent = isSystem
-    ? `${rankings.length} shows • Highest rated first`
-    : `${rankings.length} ranked show${rankings.length === 1 ? "" : "s"}`; 
-  const ordered = isSystem
-    ? [...rankings].sort((a, b) =>
-        Number(b.rating) - Number(a.rating) ||
-        String(showMap.get(String(a.show_id))?.name || "").localeCompare(
-          String(showMap.get(String(b.show_id))?.name || ""), "en", { sensitivity: "base" }
-        ) ||
-        String(a.show_id).localeCompare(String(b.show_id))
-      )
-    : rankings;
+function appendRankings(state, rankings, showMap) {
+  const fragment = document.createDocumentFragment();
+  let renderedCount = 0;
 
-  const list = document.createElement("div");
-  list.className = "creator-rankd-full-list";
-
-  ordered.forEach((ranking, index) => {
+  rankings.forEach((ranking, index) => {
     const show = showMap.get(String(ranking.show_id));
     if (!show) return;
+    renderedCount += 1;
 
     const row = document.createElement("a");
     row.className = "creator-rankd-full-row";
@@ -212,7 +195,9 @@ function renderRankings(panel, subtitle, rankings, showMap, isSystem = false) {
 
     const rank = document.createElement("strong");
     rank.className = "creator-rankd-full-rank";
-    rank.textContent = String(isSystem ? index + 1 : ranking.ladder_position || index + 1);
+    rank.textContent = String(
+      state.isSystem ? state.offset + index + 1 : ranking.ladder_position || state.offset + index + 1
+    );
 
     if (show.poster_url) {
       const poster = document.createElement("img");
@@ -240,7 +225,7 @@ function renderRankings(panel, subtitle, rankings, showMap, isSystem = false) {
     const comparisons = Number(ranking.comparisons || 0);
     meta.textContent = [
       year,
-      isSystem ? `${Number(ranking.rating)}% rating` : comparisons
+      state.isSystem ? `${Number(ranking.rating)}% rating` : comparisons
         ? `${comparisons} comparison${comparisons === 1 ? "" : "s"}`
         : "Rank'd",
     ]
@@ -249,10 +234,86 @@ function renderRankings(panel, subtitle, rankings, showMap, isSystem = false) {
 
     copy.append(name, meta);
     row.appendChild(copy);
-    list.appendChild(row);
+    fragment.appendChild(row);
   });
 
-  panel.appendChild(list);
+  state.list.insertBefore(fragment, state.status);
+  return renderedCount;
+}
+
+function updateRankdSubtitle(state) {
+  const total = Number(state.totalCount || 0).toLocaleString("en-GB");
+  const shown = state.renderedCount.toLocaleString("en-GB");
+  state.subtitle.textContent =
+    `Showing ${shown} of ${total} ${state.isSystem ? "rated" : "ranked"} shows` +
+    (state.isSystem ? " • Highest rated first" : "");
+}
+
+function updateRankdLoadStatus(state) {
+  if (!state.firstPageLoaded || state.error) return;
+  state.status.replaceChildren();
+  state.status.classList.toggle("is-complete", !state.hasMore);
+  state.status.textContent = state.loading
+    ? "Loading more shows..."
+    : state.hasMore ? "Scroll to load more" : "All shows loaded";
+}
+
+function renderRankdPageError(state) {
+  state.status.replaceChildren();
+  state.status.classList.remove("is-complete");
+  const message = document.createElement("span");
+  message.textContent = "Could not load more shows.";
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.textContent = "Retry";
+  retry.addEventListener("click", () => {
+    if (activeRankdModal !== state || state.loading) return;
+    state.error = false;
+    void loadNextRankdPage(state);
+  });
+  state.status.append(message, retry);
+}
+
+async function loadNextRankdPage(state) {
+  if (activeRankdModal !== state || state.loading || !state.hasMore || state.error) return;
+
+  state.loading = true;
+  updateRankdLoadStatus(state);
+
+  try {
+    const rankings = await fetchRankingsPage(state.userId, state.isSystem, state.offset);
+    const showIds = rankings.map((row) => row.show_id).filter(Boolean);
+    const showMap = await fetchShows(showIds);
+
+    // An old request must never re-open or populate a modal that has been closed.
+    if (activeRankdModal !== state) return;
+
+    state.renderedCount += appendRankings(state, rankings, showMap);
+    state.offset += rankings.length;
+    state.hasMore = rankings.length === PAGE_SIZE;
+
+    if (!state.firstPageLoaded) {
+      state.panel.querySelector(".creator-rankd-modal-loading")?.remove();
+      state.firstPageLoaded = true;
+      state.list.hidden = false;
+      state.panel.classList.add("is-loaded");
+    }
+    updateRankdSubtitle(state);
+  } catch (error) {
+    console.warn("Failed loading creator Rank'd page:", error);
+    if (activeRankdModal !== state) return;
+    state.error = true;
+    if (state.firstPageLoaded) {
+      renderRankdPageError(state);
+    } else {
+      renderError(state.panel, state.subtitle, error?.message);
+    }
+  } finally {
+    if (activeRankdModal === state) {
+      state.loading = false;
+      updateRankdLoadStatus(state);
+    }
+  }
 }
 
 function renderError(panel, subtitle, message) {
@@ -265,32 +326,39 @@ function renderError(panel, subtitle, message) {
   panel.appendChild(error);
 }
 
-async function openCreatorRankdList() {
-  if (!profileInfo?.id || loadingListPromise) return;
+function openCreatorRankdList() {
+  if (!profileInfo?.id || activeRankdModal) return;
 
-  const { panel, subtitle } = createLoadingModal();
+  const { modal, panel, subtitle, list, status } = createLoadingModal();
+  const state = {
+    modal,
+    panel,
+    subtitle,
+    list,
+    status,
+    userId: profileInfo.id,
+    isSystem: isBurgrsTvProfile(profileInfo),
+    totalCount: rankingCount,
+    offset: 0,
+    renderedCount: 0,
+    firstPageLoaded: false,
+    hasMore: true,
+    loading: false,
+    error: false,
+  };
 
-  loadingListPromise = (async () => {
-    const isSystem = isBurgrsTvProfile(profileInfo);
-    const rankings = await fetchAllRankings(profileInfo.id, isSystem);
-    const showIds = rankings.map((row) => row.show_id).filter(Boolean);
-    const showMap = await fetchShows(showIds);
+  activeRankdModal = state;
+  list.addEventListener("scroll", () => {
+    if (activeRankdModal !== state || !state.firstPageLoaded || state.loading || state.error || !state.hasMore) return;
+    const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
+    if (distanceFromBottom <= 180) void loadNextRankdPage(state);
+  }, { passive: true });
 
-    if (!document.body.contains(panel)) return;
-    renderRankings(panel, subtitle, rankings, showMap, isSystem);
-  })()
-    .catch((error) => {
-      console.warn("Failed loading creator full Rank'd list:", error);
-      if (document.body.contains(panel)) {
-        renderError(panel, subtitle, error?.message);
-      }
-    })
-    .finally(() => {
-      loadingListPromise = null;
-    });
+  void loadNextRankdPage(state);
 }
 
 function closeRankdModal() {
+  activeRankdModal = null;
   document.querySelector(`[${MODAL_ATTR}]`)?.remove();
   document.body.classList.remove("creator-rankd-modal-open");
 }
