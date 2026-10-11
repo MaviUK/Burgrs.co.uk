@@ -1190,16 +1190,19 @@ function ForYouCard({ show, onFeedback, onAdd, isAdding, savingFeedback }) {
               <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 21a3.13 3.13 0 0 1-3-2.88Z" />
             </svg>
           </button>
+          <button
+            type="button"
+            className="for-you-feedback"
+            onClick={() => onFeedback?.(show, "not_interested")}
+            disabled={isAdding || savingFeedback}
+            aria-label={`Not for me: don't recommend ${show.name || "this show"} again`}
+            title="Not for me"
+          >
+            <svg className="for-you-feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <button
-          type="button"
-          className="for-you-dismiss"
-          onClick={() => onFeedback?.(show, "not_interested")}
-          disabled={isAdding || savingFeedback}
-          aria-label={`Don't recommend ${show.name || "this show"} again`}
-        >
-          Not for me
-        </button>
       </div>
     </div>
   );
