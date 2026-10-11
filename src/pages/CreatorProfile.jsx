@@ -1270,7 +1270,8 @@ export default function CreatorProfile() {
         bio,
         creator_tagline,
         creator_niche,
-        creator_bio
+        creator_bio,
+        is_system_admin
       `;
 
       let { data: profileRow, error: profileError } = await supabase
