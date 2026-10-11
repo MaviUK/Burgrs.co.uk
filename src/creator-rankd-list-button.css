@@ -80,6 +80,31 @@ body.creator-rankd-modal-open {
   cursor: pointer;
 }
 
+.creator-rankd-search {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+.creator-rankd-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: #111c30;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+.creator-rankd-search input:focus {
+  border-color: #db2777;
+}
+.creator-rankd-search input::placeholder {
+  color: #94a3b8;
+}
+
 .creator-rankd-modal-loading {
   min-height: 240px;
   display: flex;
